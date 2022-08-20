@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+  <executable name="dist/default/production\v2.3_eep_bloq.production.hex">
+    <memory name="program">
+      <units>words</units>
+      <length>2048</length>
+      <used>374</used>
+      <free>1674</free>
+    </memory>
+    <memory name="data">
+      <units>bytes</units>
+      <length>128</length>
+      <used>97</used>
+      <free>31</free>
+    </memory>
+  </executable>
+</project>
