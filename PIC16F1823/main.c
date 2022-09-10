@@ -1,10 +1,9 @@
 /*
- * ESPECIAL KAME SEM RETARDO DE 5SEG
  * BLOQUEIO DIRETO 
  * File:   bloq_v2.2_eep_block_LUF.c
  * Author: Marcos Vinicius
  *
- * Created on 08 de MarÁo de 2021, 10:00
+ * Created on 08 de Mar√ßo de 2021, 10:00
  * Para Natalinda
  * 
  */
@@ -119,7 +118,7 @@ int ler_adc_vref2(){
         adc_Return = adc_Average/16;
         return adc_Return;
 }
-*/ //Tensıes de referencia com trimpot da auto v0
+*/ //Tens√µes de referencia com trimpot da auto v0
 int tbat_media(){
     int adc_Reading;
     unsigned int adc_Average;
@@ -184,7 +183,7 @@ int botao_media(){
     
     return (adc_Return);  
 } //leitura do jumper JP3
-//funÁ„o de gravar e ler da eeprom
+//fun√ß√£o de gravar e ler da eeprom
 void eeprom_write_code(unsigned int ADRL, unsigned int DATA){
     unsigned int gie_Status;
     
@@ -225,9 +224,9 @@ int main() {
     OSCTUNE = 0b00000000;
     //------
     // ADC CFG
-    // SeleÁ„o dos canais AN1_bateria , AN2 VREF1 - baixa e AN5 VREF2 - alta via funÁ„o
-    ADFM = 1; //bits de convers„o justificados a direita
-    ADCS0 = 0; //clock da convers„o TAD - FOSC/8 
+    // Sele√ß√£o dos canais AN1_bateria , AN2 VREF1 - baixa e AN5 VREF2 - alta via fun√ß√£o
+    ADFM = 1; //bits de convers√£o justificados a direita
+    ADCS0 = 0; //clock da convers√£o TAD - FOSC/8 
     ADCS1 = 0; //------
     ADCS2 = 1; //------
     //ADNREF = 0; //referencia negativa = VSS
@@ -239,24 +238,24 @@ int main() {
     //Leitura dos valores calibrados daa EEPROM 
     __delay_ms(1);    
     unsigned int bit_low_adrsh_read = eeprom_read_code(0x01); //eeprom_read_code(ADRL, DATA)
-    __delay_ms(1); //delay de seguranÁa par eeprom
-    unsigned int bit_low_adrsl_read = eeprom_read_code(0x00); // enredeÁo 0x00 e 0x01 = baixa  
-    __delay_ms(1); //delay de seguranÁa par eeprom
+    __delay_ms(1); //delay de seguran√ßa par eeprom
+    unsigned int bit_low_adrsl_read = eeprom_read_code(0x00); // enrede√ßo 0x00 e 0x01 = baixa  
+    __delay_ms(1); //delay de seguran√ßa par eeprom
     bit_low_adrsh_read = (bit_low_adrsh_read<<8); //reorganiza os bits e salva valor
     unsigned int min = bit_low_adrsh_read+bit_low_adrsl_read; //define 'min'    
     //leitura da eeprom - Alta
-    __delay_ms(1); //delay de seguranÁa par eeprom
+    __delay_ms(1); //delay de seguran√ßa par eeprom
     unsigned int bit_high_adrsl_read = eeprom_read_code(0x02); //eeprom_read_code(ADRL, DATA)
-    __delay_ms(1); //delay de seguranÁa par eeprom
-    unsigned int bit_high_adrsh_read = eeprom_read_code(0x03); //endereÁo 0x02 e 0x03 = alta   
-    __delay_ms(1); //delay de seguranÁa par eeprom
+    __delay_ms(1); //delay de seguran√ßa par eeprom
+    unsigned int bit_high_adrsh_read = eeprom_read_code(0x03); //endere√ßo 0x02 e 0x03 = alta   
+    __delay_ms(1); //delay de seguran√ßa par eeprom
     bit_high_adrsh_read = (bit_high_adrsh_read<<8); //reorganiza os bits e salva valor
     unsigned int max = bit_high_adrsh_read+bit_high_adrsl_read; //define 'max'
     //------------------------
     inicio:    //caminho para goto   
     //----------------    
     __delay_ms(1);
-    while( b < 2 ){ //funÁ„o loop em monitoramento        
+    while( b < 2 ){ //fun√ß√£o loop em monitoramento        
     led2 = 0; // LED Funcionamento
     //------------------- Programa REAL 'monitoramento'
     if (min>tbat_media()){
@@ -271,7 +270,7 @@ int main() {
    }; //while fim
    //---------------------   
     __delay_ms(1);
-    while( a < 2 ){ //funÁ„o loop 'bloqueada'
+    while( a < 2 ){ //fun√ß√£o loop 'bloqueada'
     led2 = 0; // LED Funcionamento
     //-------------------- Programa REAL 'bloqueada'
     if (max<=tbat_media()){
