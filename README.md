@@ -3,10 +3,10 @@
 Projetos desenvolvidos também com layout PCB e esquema elétrico.
 
 Trabalhando atualmente em :
-- Sistema - 800R00
+- Sistema - LUF800R00
 
 Sistemas desenvolvidos para uso industrial.
-- LUF800R00:-> Sistema alvo Arduino -> WIP saida JSON
+- LUF800R00: -> Sistema alvo Arduino -> WIP saida JSON
   - Sistema de automação simples, com disponibilidade de acoplamento em outros sistemas.
 - LUF200R00: Placa padrão de testes -> Sistema alvo Arduino
   - Sistema de controle Bivolt
