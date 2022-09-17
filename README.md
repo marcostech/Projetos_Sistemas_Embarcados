@@ -16,3 +16,4 @@ Sistemas desenvolvidos para uso industrial.
   - Sistema de controle PWM para resistencias de aquecedores, porém usadas em outra finalidade em ambiente industrial e com baterias
 - PIC16F1823: -> Sistema alvo MPLAB
   - Sistema de controle automatizado industrial
+- PSU100R00: -> Fonte de alimentação
