@@ -1,4 +1,3 @@
-
 /* Project Name: Sistema de Controle Automatico
    Author: Marcos Vinicius Pereira da Silva
    Date: 09/09/22
@@ -11,13 +10,14 @@
    but we recommend otherwise.
    Any changes on this code is not permited, under lincesed use only
 */
+//Library
 #include <EEPROM.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <ArduinoJson.h>
-
+//------------------------
 //Display CFG
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
@@ -61,41 +61,27 @@ static const unsigned char PROGMEM logo_bmp[] =
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
-
-//----- Pre - Defined ADC CFG ----
+//------------------------
+//ADC CFG
 #define ADC_CH  A1
-const float ADC_FIX = 0.002;
-const float END_VOLTAGE = 14.70;
-const float START_VOLTAGE = 11.80;
-const byte MAX_CHARGE_TIME = 10;
-//-----------------------
+//------------------------
 //Digital CFG
 #define buttonCursorUp 7
 #define buttonCursorDown 8
 #define buttonEnter 9
-uint8_t cursorDelayTime = 0; //cursors debounce delay
+uint8_t cursorDelayTime = 0; //buffer variable to store input data
 uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
-boolean  menuEnabled = false;
-//
-//EEPROM CFG address
+boolean  menuEnabled = false; //Start with menu disabled
+//------------------------
+//EEPROM CFG
+const long OVF = 1000000;
 int endVoltageADDR = 10;
 int startVoltageADDR = 20;
 int maxChargeTimeADDR = 30;
 int R1ADDR = 40;
 int R2ADDR = 50;
 int adcFixADDR = 60;
-//-------------
-//function to check memory
-extern unsigned int __bss_end;
-extern void *__brkval;
-int freeMemory() {
-  int free_memory;
-  if ((int) __brkval)
-    return ((int) &free_memory) - ((int) __brkval);
-  return ((int) &free_memory) - ((int) &__bss_end);
-}
-//-----------------------------------
-
+//------------------------
 void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus) {
   StaticJsonDocument<96> doc;
   char bufferArr[6];
@@ -104,9 +90,8 @@ void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, St
   doc["chargeTime"] = cycleTime;
   doc["currentCycle"] = cycleCurrent;
   doc["chargeStatus"] = cycleStatus;
-  Serial.println();
   serializeJsonPretty(doc, Serial);
-  Serial.flush();
+  Serial.println(); // make correct exibition in terminal - remove when sending to a programm
 }
 
 class ChargeCycle  {
@@ -116,20 +101,22 @@ class ChargeCycle  {
     unsigned long  offsetMillis;
 
   public:
-    ChargeCycle () {
-      currentCycle = 1;
-      offsetMillis = 0;
-      currentTimeHours = 0;
-    }
+    ChargeCycle ():currentCycle(1), offsetMillis(0), currentTimeHours(0) { }
 
     String getCurrentTimeFormated () {
-      unsigned long currentTimeSeconds = (millis() - offsetMillis ) / 1000;
+      unsigned long currentTimeSeconds = (millis() - offsetMillis ) / 1000; //Test different time scenarios here
       short currentTimeMinutes = 0;
       short currentTimeHoursFormated = 0;
       short currentTimeSecondsFormated = 0;
       short currentTimeMinutesFormated = 0;
       boolean hasTimeLeft = true;
-
+      
+      /*If the seconds variables has more than 60 then decrement 60 and add +1 to minutes
+       * Loop until there is seconds / 60 < 1
+       * Minutes loop will have the same logic
+       * Hours will only be incremented
+      */
+      
       //Seconds processing
       while (hasTimeLeft) {
         if ((currentTimeSeconds / 60) >= 1) {
@@ -151,7 +138,7 @@ class ChargeCycle  {
           currentTimeMinutesFormated = currentTimeMinutes;
         }
       }
-      //String formater
+      //String formater - get values and make a formated string to return
       setCurrentTimeHours(currentTimeHoursFormated);
       char stringBuffer[20];
       sprintf(stringBuffer, "%02d:%02d:%02d", currentTimeHoursFormated, currentTimeMinutesFormated, currentTimeSeconds);
@@ -181,31 +168,33 @@ class ChargeCycle  {
 
 class Battery {
   private:
-    float voltage = 0.00f;
+    float voltage;
     float endVoltage;
     float startVoltage;
     byte maxChargeTime;
 
   public:
-    Battery() {
-     endVoltage = EEPROM.get(endVoltageADDR, endVoltage);
-     delay(10);
-     if(isnan(endVoltage)) {
-          endVoltage = END_VOLTAGE;
+    Battery(): endVoltage(0), startVoltage(0), maxChargeTime(0), voltage(0) {
+      
+      endVoltage = EEPROM.get(endVoltageADDR, endVoltage);
+      delay(10);
+      if (isnan(endVoltage) || endVoltage <= 0 || endVoltage > OVF) {
+        endVoltage = 14.70;
       }
 
-     startVoltage = EEPROM.get(startVoltageADDR, startVoltage);
-     delay(10);
-      if(isnan(startVoltage)) {
-          startVoltage = START_VOLTAGE;
+      startVoltage = EEPROM.get(startVoltageADDR, startVoltage);
+      delay(10);
+      if (isnan(startVoltage) || startVoltage <= 0 || startVoltage > OVF) {
+        startVoltage = 11.80;
       }
 
-     maxChargeTime = EEPROM.get(maxChargeTimeADDR, maxChargeTime);   
-     delay(10);  
-     if(isnan(maxChargeTime)) {
-          maxChargeTime = MAX_CHARGE_TIME;
+      maxChargeTime = EEPROM.get(maxChargeTimeADDR, maxChargeTime);
+      delay(10);
+      if (isnan(maxChargeTime) || maxChargeTime <= 0 || maxChargeTime > 254) {
+        maxChargeTime = 10;
       }
     }
+    
     float getVoltage () {
       return voltage;
     }
@@ -228,12 +217,12 @@ class Battery {
     }
 
     void  setEndVoltage (float voltage) {
-      endVoltage = voltage;      
+      endVoltage = voltage;
       EEPROM.put(endVoltageADDR, endVoltage);
     }
 
     void setMaxChargeTime (byte newChargeTime) {
-      maxChargeTime = newChargeTime;      
+      maxChargeTime = newChargeTime;
       EEPROM.put(maxChargeTimeADDR, maxChargeTime);
     }
 
@@ -245,30 +234,32 @@ class Battery {
 
 class AdConverter {
   private:
-    float R1;
-    float R2;
+    float Resistor1;
+    float Resistor2;
     float adcFix;
     byte adcChannel = A1;
     float aref = 0.00342 ;
 
   public:
-    adConverter () {    
-     R1 = EEPROM.get(R1ADDR, R1);
-     delay(10);
-     if(isnan(R1)) {
-          R1 = 98400;
-      }
-     R2 = EEPROM.get(R2ADDR, R2);
-     delay(10);
-     if(isnan(R2)) {
-          R2 = 4550;
-      }
-     adcFix = EEPROM.get(adcFixADDR, adcFix);
-     delay(10);
-     if(isnan(adcFix)) {
-          adcFix = 0.002;
+    AdConverter(): Resistor1(0), Resistor2(0), adcFix(0) {
+      
+      Resistor1 = EEPROM.get(R1ADDR, Resistor1);
+      delay(10);
+      if (isnan(Resistor1) || Resistor1 <= 0 || Resistor1 > OVF) {
+        Resistor1 = 98400.00;
       }
       
+      Resistor2 = EEPROM.get(R2ADDR, Resistor2);
+      delay(10);
+      if (isnan(Resistor2) || Resistor2 <= 0 || Resistor2 > OVF) {
+        Resistor2 = 4550.00;
+      }
+      
+      adcFix = EEPROM.get(adcFixADDR, adcFix);
+      delay(10);
+      if (isnan(adcFix) || adcFix <= 0 || adcFix > OVF) {
+        adcFix = 0.002;
+      }
     }
 
     float getReading (int iteratorLimit) {
@@ -284,10 +275,9 @@ class AdConverter {
       float adcReadRaw = 0;
       adcRead = sqrt(adcRead);
       adcRead *= aref;  // (adcRead * AREF) / 1024.00 - currently -> Aref = 3,500
-      adcRead = adcRead / (R2 / (R1 + R2)); // Vout / (R2/(R1+R2)) - currently -> 4550 / 102.950 = 0,04419
+      adcRead = adcRead / (Resistor2 / (Resistor1 + Resistor2)); // Vout / (R2/(R1+R2)) - currently -> 4550 / 102.950 = 0,04419
       adcReadRaw = (adcRead * getAdcFix()); // minor % fix on readings
       adcRead -= adcReadRaw;
-
       return adcRead;
     }
 
@@ -301,21 +291,21 @@ class AdConverter {
     }
 
     void setR1 (float R1Value) {
-      R1 = R1Value;
-      EEPROM.put(R1ADDR, R1);
+      Resistor1 = R1Value;
+      EEPROM.put(R1ADDR, Resistor1);
     }
 
     float getR1 () {
-      return R1 ;
+      return Resistor1 ;
     }
 
     void setR2 (float R2Value) {
-      R2 = R2Value;
-      EEPROM.put(R2ADDR, R2);
+      Resistor2 = R2Value;
+      EEPROM.put(R2ADDR, Resistor2);
     }
 
     float getR2 () {
-      return R2 ;
+      return Resistor2 ;
     }
 
     void setAdcChannel (byte NewAdcChannel) {
@@ -326,17 +316,17 @@ class AdConverter {
       return adcChannel;
     }
 };
-
 //---------------------------------
-
 void setup() {
+  //3.5V external reference
   analogReference(EXTERNAL);
-  //Wire.setClock(100000); //make i2c less sensitive
+  //Led PWR on cfg
   pinMode (LED_BUILTIN, OUTPUT);
+  //button cfg
   pinMode(buttonCursorUp, INPUT_PULLUP);
   pinMode(buttonCursorDown, INPUT_PULLUP);
-  pinMode(buttonEnter, INPUT_PULLUP);
-  // -------- Display verifier
+  pinMode(buttonEnter, INPUT_PULLUP);  
+  //Display verifier
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     while (true) { //Lock program if display fail
       digitalWrite(LED_BUILTIN, HIGH);
@@ -345,23 +335,25 @@ void setup() {
       delay(100);
     }
   }
-  // -------- Display Template
+  //Display Template
   display.clearDisplay(); //Clear display data
   display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
   display.display();
   display.setTextColor(SSD1306_WHITE);
   delay(100);
-  // --------
 }
 
 void loop() {
+  Serial.begin(115200);
+  //Class constructor
   AdConverter adc;
   Battery battery;
-  ChargeCycle cycle;
-  Serial.begin(115200);
+  ChargeCycle cycle;  
+  //"Global" utils
   unsigned long previousMillis = 0;
-  byte chargeStatus = 0;
+  byte chargeStatus = 0; //Start System on Status - 0
   String lastTime;
+  //System Lock
   while (true) { //Power On Routine -- TODO: change to State Machina -> switch case?
     //Button state checker - menu entry
     if (digitalRead(buttonEnter) == LOW) {
@@ -371,29 +363,30 @@ void loop() {
     }
     if (cursorDelayTime > cursorDelayTimeMenuEntry) {
       menuEnabled = true;
-      cursorDelayTime = 0;
+      cursorDelayTime = 0; 
       chargeStatus = 0;
     }
+
     //Menu Entry loop
     while (menuEnabled) {            // Menu CFG Routine -- TODO: change to State Machine -> switch case?
       uint8_t menuUse = 0;
       uint8_t menuCursorPosition = 0;
       uint8_t menuPage = 0;
-      uint8_t cursorDelayTimeUp = 0;
-      uint8_t cursorDelayTimeDown = 0;
-      uint8_t cursorDelayTimeInterval = 1;
-      uint8_t cursorDelayTimeIntervalMenu = 2;
+      uint8_t cursorDelayTimeUp = 0; //buffer variable to store input data
+      uint8_t cursorDelayTimeDown = 0; ////buffer variable to store input data
+      uint8_t cursorDelayTimeInterval = 1; //interval for accept the input
+      uint8_t cursorDelayTimeIntervalMenu = 2; //interval for accept the input
 
       display.clearDisplay();
       display.display();
-      delay(1000);
+      delay(1000); //make small delay for the user to release the Enter button
       while (menuEnabled) {
         //Page 1
         while (menuPage == 0) {
-          //Menu display
+          //Menu display - necessary here for correct exhibition after the hover animation
           display.clearDisplay();
           display.setTextSize(1);
-          display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+          display.setTextColor(SSD1306_WHITE, SSD1306_BLACK); //change back to original color, after hover animation has set the inverse
           display.setCursor(1, 1);
           display.print(F("Menu Prog .Sair"));
           display.setCursor(1, 12);
@@ -401,23 +394,26 @@ void loop() {
           display.setCursor(1, 22);
           display.print(F("2 - V final de carga"));
           //Button state checker
+          //Up - checker
           if (digitalRead(buttonCursorUp) == LOW) {
             cursorDelayTimeUp++;
           } else {
             cursorDelayTimeUp = 0;
           }
+          //Up - set
           if (cursorDelayTimeUp > cursorDelayTimeInterval) {
             menuCursorPosition++;
             cursorDelayTimeUp = 0;
           }
-
+          //Down - checker
           if (digitalRead(buttonCursorDown) == LOW) {
             cursorDelayTimeDown++;
           } else {
             cursorDelayTimeDown = 0;
           }
+          //Down - set
           if (cursorDelayTimeDown > cursorDelayTimeInterval) {
-            if (menuCursorPosition > 0) {
+            if (menuCursorPosition > 0) { //Dont let the cursor go negative
               menuCursorPosition--;
             } else {
               menuCursorPosition = 0;
@@ -426,21 +422,22 @@ void loop() {
           }
           //Menu Selection
           switch (menuCursorPosition) {
-            case 0: //Set minimum pre-charge time Value
+            case 0: //Exit CFG menu
               //Hover animation
               if (menuCursorPosition == 0) {
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation setter, change background to white and font to black
                 display.print(F("Menu Prog .Sair"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -453,39 +450,40 @@ void loop() {
                 display.print(F("Dentro do Menu:"));
                 display.print(menuCursorPosition);
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                   menuUse = 0;
                   menuPage = 5; //number higher just to escape menu page loop
                   cursorDelayTime = 0;
                   menuEnabled = false;
-                  //Exit function
                   display.clearDisplay();
                 }
               }
 
               break;
-            case 1: //Set charging start voltage Value
+            case 1: //Set charger start voltage Value
               //Hover animation
               if (menuCursorPosition == 1) {
                 display.setCursor(1, 12);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 display.print(F("1 - V de REcarga"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - check
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -494,39 +492,41 @@ void loop() {
               while (menuUse == 1) {
                 display.clearDisplay();
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
+                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
                 display.print(F("Valor atual:"));
                 display.print(battery.getStartVoltage());
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu ) {
                   menuUse = 0;
                   menuPage = 0;
                   cursorDelayTime = 0;
                 }
-
-                //Button state checker
+                //Up - checker
                 if (digitalRead(buttonCursorUp) == LOW) {
                   cursorDelayTimeUp++;
                 } else {
                   cursorDelayTimeUp = 0;
                 }
+                //Up - set
                 if (cursorDelayTimeUp > (cursorDelayTimeInterval + 2)) {
                   battery.setStartVoltage(battery.getStartVoltage() + 0.05);
                   cursorDelayTimeUp = 0;
                 }
-
+                //Down - checker
                 if (digitalRead(buttonCursorDown) == LOW) {
                   cursorDelayTimeDown++;
                 } else {
                   cursorDelayTimeDown = 0;
                 }
+                //Down - set
                 if (cursorDelayTimeDown > (cursorDelayTimeInterval + 2)) {
                   battery.setStartVoltage(battery.getStartVoltage() - 0.05);
                   cursorDelayTimeDown = 0;
@@ -534,21 +534,22 @@ void loop() {
               }
               break;
 
-            case 2: //Set charging end voltage Value
+            case 2: //Set charger end voltage Value
               //Hover animation
               if (menuCursorPosition == 2) {
                 display.setCursor(1, 22);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 display.print(F("2 - V final de carga"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -557,48 +558,52 @@ void loop() {
               while (menuUse == 1) {
                 display.clearDisplay();
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
+                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
                 display.print(F("Valor Atual:"));
                 display.print(battery.getEndVoltage());
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                   menuUse = 0;
                   menuPage = 0;
                   cursorDelayTime = 0;
                 }
-
-                //Button state checker
+                //Up - checker
                 if (digitalRead(buttonCursorUp) == LOW) {
                   cursorDelayTimeUp++;
                 } else {
                   cursorDelayTimeUp = 0;
                 }
+                //Up -set
                 if (cursorDelayTimeUp > (cursorDelayTimeInterval + 2)) {
                   battery.setEndVoltage(battery.getEndVoltage() + 0.05);
                   cursorDelayTimeUp = 0;
                 }
-
+                //Down - checker
                 if (digitalRead(buttonCursorDown) == LOW) {
                   cursorDelayTimeDown++;
                 } else {
                   cursorDelayTimeDown = 0;
                 }
+                //Down - set
                 if (cursorDelayTimeDown > (cursorDelayTimeInterval + 2)) {
                   battery.setEndVoltage(battery.getEndVoltage() - 0.05);
                   cursorDelayTimeDown = 0;
                 }
               }
               break;
+              
             case 3:
               menuPage = 1;
               break;
+              
             default:
               break;
           }
@@ -606,21 +611,24 @@ void loop() {
         //Page 2
         while (menuPage == 1) {
           //Button state checker
+          //Up - checker
           if (digitalRead(buttonCursorUp) == LOW) {
             cursorDelayTimeUp++;
           } else {
             cursorDelayTimeUp = 0;
           }
+          //Up - set
           if (cursorDelayTimeUp > cursorDelayTimeInterval) {
             menuCursorPosition++;
             cursorDelayTimeUp = 0;
           }
-
+          //Down - checker
           if (digitalRead(buttonCursorDown) == LOW) {
             cursorDelayTimeDown++;
           } else {
             cursorDelayTimeDown = 0;
           }
+          //Down - set
           if (cursorDelayTimeDown > cursorDelayTimeInterval) {
             if (menuCursorPosition > 0) {
               menuCursorPosition--;
@@ -629,7 +637,6 @@ void loop() {
             }
             cursorDelayTimeDown = 0;
           }
-          //------------
           //Menu display
           display.clearDisplay();
           display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
@@ -639,27 +646,28 @@ void loop() {
           display.print(F("4 - Corrigir ADC"));
           display.setCursor(1, 22);
           display.print(F("5 - Setar R1"));
-          //----------
 
           switch (menuCursorPosition) {
             case 2:
               menuPage = 0;
               break;
+              
             case 3: //Set charging maximum time Value
               //Hover animation
               if (menuCursorPosition == 3) {
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 display.print(F("3 - T maximo de carga"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -668,39 +676,41 @@ void loop() {
               while (menuUse == 1) {
                 display.clearDisplay();
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
+                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
                 display.print(F("Valor atual em Horas:"));
                 display.print(battery.getMaxChargeTime());
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu ) {
                   menuUse = 0;
                   menuPage = 1;
                   cursorDelayTime = 0;
                 }
-
-                //Button state checker
+                //Up - checker
                 if (digitalRead(buttonCursorUp) == LOW) {
                   cursorDelayTimeUp++;
                 } else {
                   cursorDelayTimeUp = 0;
                 }
+                //Up - set
                 if (cursorDelayTimeUp > (cursorDelayTimeInterval + 2)) {
                   battery.setMaxChargeTime(battery.getMaxChargeTime() + 1);
                   cursorDelayTimeUp = 0;
                 }
-
+                //Down - checker
                 if (digitalRead(buttonCursorDown) == LOW) {
                   cursorDelayTimeDown++;
                 } else {
                   cursorDelayTimeDown = 0;
                 }
+                //Downd - set
                 if (cursorDelayTimeDown > (cursorDelayTimeInterval + 2)) {
                   battery.setMaxChargeTime(battery.getMaxChargeTime() - 1);
                   cursorDelayTimeDown = 0;
@@ -718,11 +728,13 @@ void loop() {
               }
               //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -738,33 +750,36 @@ void loop() {
                 display.display();
                 //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu ) {
                   menuUse = 0;
                   menuPage = 1;
                   cursorDelayTime = 0;
                 }
-
-                //Button state checker
+                //Up - checker
                 if (digitalRead(buttonCursorUp) == LOW) {
                   cursorDelayTimeUp++;
                 } else {
                   cursorDelayTimeUp = 0;
                 }
+                //Up - set
                 if (cursorDelayTimeUp > (cursorDelayTimeInterval + 2)) {
                   adc.setAdcFix(adc.getAdcFix() + 0.001);
                   cursorDelayTimeUp = 0;
                 }
-
+                //Down - checker
                 if (digitalRead(buttonCursorDown) == LOW) {
                   cursorDelayTimeDown++;
                 } else {
                   cursorDelayTimeDown = 0;
                 }
+                //Down - set
                 if (cursorDelayTimeDown > (cursorDelayTimeInterval + 2)) {
                   adc.setAdcFix(adc.getAdcFix() - 0.001);
                   cursorDelayTimeDown = 0;
@@ -776,17 +791,18 @@ void loop() {
               //Hover animation
               if (menuCursorPosition == 5) {
                 display.setCursor(1, 22);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 display.print(F("5 - Setar R1"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeInterval) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -795,39 +811,41 @@ void loop() {
               while (menuUse == 1) {
                 display.clearDisplay();
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
+                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
                 display.print(F("Valor Atual:"));
                 display.print(adc.getR1());
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                   menuUse = 0;
                   menuPage = 1;
                   cursorDelayTime = 0;
                 }
-
-                //Button state checker
+                //Up - checker
                 if (digitalRead(buttonCursorUp) == LOW) {
                   cursorDelayTimeUp++;
                 } else {
                   cursorDelayTimeUp = 0;
                 }
+                //Up -set
                 if (cursorDelayTimeUp > (cursorDelayTimeInterval + 2)) {
                   adc.setR1(adc.getR1() + 100);
                   cursorDelayTimeUp = 0;
                 }
-
+                //Down - checker
                 if (digitalRead(buttonCursorDown) == LOW) {
                   cursorDelayTimeDown++;
                 } else {
                   cursorDelayTimeDown = 0;
                 }
+                //Down - set
                 if (cursorDelayTimeDown > (cursorDelayTimeInterval + 2)) {
                   adc.setR1(adc.getR1() - 100);
                   cursorDelayTimeDown = 0;
@@ -838,6 +856,7 @@ void loop() {
             case 6:
               menuPage = 2;
               break;
+              
             default:
               break;
           }
@@ -845,21 +864,24 @@ void loop() {
         //Page 3
         while (menuPage == 2) {
           //Button state checker
+          //Up - checker
           if (digitalRead(buttonCursorUp) == LOW) {
             cursorDelayTimeUp++;
           } else {
             cursorDelayTimeUp = 0;
           }
+          //Up - set
           if (cursorDelayTimeUp > cursorDelayTimeInterval) {
             menuCursorPosition++;
             cursorDelayTimeUp = 0;
           }
-
+          //Down - checker
           if (digitalRead(buttonCursorDown) == LOW) {
             cursorDelayTimeDown++;
           } else {
             cursorDelayTimeDown = 0;
           }
+          //Down - set         
           if (cursorDelayTimeDown > cursorDelayTimeInterval) {
             if (menuCursorPosition > 0) {
               menuCursorPosition--;
@@ -868,8 +890,7 @@ void loop() {
             }
             cursorDelayTimeDown = 0;
           }
-          //-------------
-          //Menu display
+          //Menu display - necessary for animations
           display.clearDisplay();
           display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
           display.setCursor(1, 1);
@@ -878,7 +899,7 @@ void loop() {
           display.print(F("7 - Reservado"));
           display.setCursor(1, 22);
           display.print(F("8 - Reservado"));
-          //----------
+          
           switch (menuCursorPosition) {
             case 5:
               menuPage = 1;
@@ -888,17 +909,18 @@ void loop() {
               //Hover animation
               if (menuCursorPosition == 6) {
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 display.print(F("6 - Setar R2"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeInterval) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -907,60 +929,64 @@ void loop() {
               while (menuUse == 1) {
                 display.clearDisplay();
                 display.setCursor(1, 1);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
+                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
                 display.print(F("Valor Atual:"));
                 display.print(adc.getR2());
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                   menuUse = 0;
                   menuPage = 2;
                   cursorDelayTime = 0;
                 }
-
-                //Button state checker
+                //Up - checker
                 if (digitalRead(buttonCursorUp) == LOW) {
                   cursorDelayTimeUp++;
                 } else {
                   cursorDelayTimeUp = 0;
                 }
+                //Up - set
                 if (cursorDelayTimeUp > (cursorDelayTimeInterval + 2)) {
                   adc.setR2(adc.getR2() + 50);
                   cursorDelayTimeUp = 0;
                 }
-
+                //Down - checker
                 if (digitalRead(buttonCursorDown) == LOW) {
                   cursorDelayTimeDown++;
                 } else {
                   cursorDelayTimeDown = 0;
                 }
+                //Down - set
                 if (cursorDelayTimeDown > (cursorDelayTimeInterval + 2)) {
                   adc.setR2(adc.getR2() - 50);
                   cursorDelayTimeDown = 0;
                 }
               }
               break;
+              
             case 7: //Reserved - TODO: Set pre defined values for 12v -24v - 36v - 48v
               //Hover animation
               if (menuCursorPosition == 7) {
                 display.setCursor(1, 12);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 display.print(F("7 - Reservado"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeInterval) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -969,17 +995,18 @@ void loop() {
               while (menuUse == 1) {
                 display.clearDisplay();
                 display.setCursor(1, 22);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Blink animation remove
+                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
                 display.print(F("Dentro do Menu:"));
                 display.print(menuCursorPosition);
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                   menuUse = 0;
                   menuPage = 2;
@@ -988,21 +1015,22 @@ void loop() {
               }
               break;
 
-            case 8: //Reserved
+            case 8:
               //Hover animation
               if (menuCursorPosition == 8) {
                 display.setCursor(1, 22);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Blink animation set
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
                 display.print(F("8 - Reservado"));
                 display.display();
               }
-              //--------------
               //Button state checker
+              //Enter - checker
               if (digitalRead(buttonEnter) == LOW) {
                 cursorDelayTime++;
               } else {
                 cursorDelayTime = 0;
               }
+              //Enter - set
               if (cursorDelayTime > cursorDelayTimeInterval) {
                 menuUse = 1;
                 cursorDelayTime = 0;
@@ -1011,17 +1039,18 @@ void loop() {
               while (menuUse == 1) {
                 display.clearDisplay();
                 display.setCursor(1, 22);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Blink animation remove
+                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
                 display.print(F("Dentro do Menu:"));
                 display.print(menuCursorPosition);
                 display.display();
-                //Set value
                 //Button state checker
+                //Enter - checker
                 if (digitalRead(buttonEnter) == LOW) {
                   cursorDelayTime++;
                 } else {
                   cursorDelayTime = 0;
                 }
+                //Enter - set
                 if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
                   menuUse = 0;
                   menuPage = 2;
@@ -1029,23 +1058,24 @@ void loop() {
                 }
               }
               break;
+              
             case 9:
               menuPage = 0;
               menuCursorPosition = 0;
               break;
+              
             default:
               break;
           }
         }
       }
     }
-    //--------------
-
+    //Charger - Startup
     while (chargeStatus == 0) {     // Self-Test Routine -- TODO: change to State Machine -> switch case?
       chargeStatus = 1;
       //load variables or selftest
     }
-
+    //Charger - Charge
     while (chargeStatus == 1) {      // On Charge Routine -- TODO: change to State Machine -> switch case?
       //Button state checker - menu entry
       if (digitalRead(buttonEnter) == LOW) {
@@ -1059,13 +1089,10 @@ void loop() {
         cursorDelayTime = 0;
         chargeStatus = 0;
       }
-      //---
-      //Led system on
+      //Led system on blink
       !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
-
-      //voltage reading and battery setting
+      //Voltage reading and battery setting
       battery.setVoltage(adc.getReading(8000));
-
       //Display routine
       display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
       display.setTextColor(SSD1306_WHITE);
@@ -1079,26 +1106,22 @@ void loop() {
       display.setCursor(52, 1);
       display.println(battery.getVoltage(), 2);
       display.display();
-      //
-
+      //Send Json
       unsigned long currentMillis = millis();
       if (currentMillis - previousMillis >= 200) {
         previousMillis = currentMillis;
-        //Send Json
         sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
-        //-----------------
         delay(50);
       }
-
-      if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) { // time or voltage - charge complete checker
+      //Charge complete checker
+      if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) { 
         lastTime = cycle.getCurrentTimeFormated();
-        chargeStatus = 2; // set status
+        chargeStatus = 2; 
         display.clearDisplay();
         previousMillis = millis();
       }
-
     }
-
+    //Charger - Complete
     while (chargeStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
       //Button state checker - menu entry
       if (digitalRead(buttonEnter) == LOW) {
@@ -1111,7 +1134,7 @@ void loop() {
         cursorDelayTime = 0;
         chargeStatus = 0;
       }
-      //---
+      //Display Routine
       display.setTextSize(1);
       display.setCursor(1, 1);
       display.print(F("Completa: ciclo "));
@@ -1121,24 +1144,21 @@ void loop() {
       display.println(lastTime);
       display.display();
       battery.setVoltage(adc.getReading(8000));
-
+      //Send Json
       unsigned long currentMillis = millis();
       if (currentMillis - previousMillis >= 200) {
         previousMillis = currentMillis;
-        //Send Json
         sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
-        //-----------------
         delay(50);
       }
-
+      //Start Voltage checker
       if (battery.getStartVoltage() > battery.getVoltage()) {
         cycle.addCurrentCycle();
-        chargeStatus = 1; // set status
+        chargeStatus = 1;
         display.clearDisplay();
         cycle.setOffsetMillis(millis());
       }
     }
-  }
+    
+  } //Turn ON LOOP
 }
-
-
