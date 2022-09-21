@@ -1,0 +1,5 @@
+{
+    "sketch": "automatico_v1\\automatico_v1.ino",
+    "configuration": "cpu=atmega328",
+    "board": "arduino:avr:nano"
+}
