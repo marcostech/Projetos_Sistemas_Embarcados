@@ -1212,8 +1212,8 @@ void loop() {
     }
     //Charger - Complete
     while (chargeStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
-      digitalWrite(outputRelay, LOW);
-      digitalWrite(outputExtra, HIGH);
+      digitalWrite(outputRelay, HIGH);
+      digitalWrite(outputExtra, LOW);
       //Button state checker - menu entry
       if (digitalRead(buttonEnter) == LOW) {
         cursorDelayTime++;
