@@ -16,7 +16,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <ArduinoJson.h>
+//#include <ArduinoJson.h>
 //------------------------
 //Display CFG
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -85,17 +85,8 @@ int R1ADDR = 40;
 int R2ADDR = 50;
 int adcFixADDR = 60;
 //------------------------
-void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus) {
-  StaticJsonDocument<96> doc;
-  char bufferArr[6];
-  dtostrf(batteryVoltage, 4, 2, bufferArr);
-  doc["batteryVoltage"] = bufferArr;
-  doc["chargeTime"] = cycleTime;
-  doc["currentCycle"] = cycleCurrent;
-  doc["chargeStatus"] = cycleStatus;
-  serializeJsonPretty(doc, Serial);
-  Serial.println(); // make correct exibition in terminal - remove when sending to a programm
-}
+//void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
+void menuConfig();
 
 class ChargeCycle  {
   private:
@@ -104,7 +95,8 @@ class ChargeCycle  {
     unsigned long  offsetMillis;
 
   public:
-    ChargeCycle (): currentCycle(1), offsetMillis(0), currentTimeHours(0) { }
+    ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0){};
+    void Begin(){};
 
     String getCurrentTimeFormated () {
       unsigned long currentTimeSeconds = (millis() - offsetMillis ) / 1000; //Test different time scenarios here
@@ -177,7 +169,8 @@ class Battery {
     byte maxChargeTime;
 
   public:
-    Battery(): endVoltage(0), startVoltage(0), maxChargeTime(0), voltage(0) {
+    Battery():endVoltage(0), startVoltage(0), maxChargeTime(0), voltage(0){};
+    void Begin(){
 
       endVoltage = EEPROM.get(endVoltageADDR, endVoltage);
       delay(10);
@@ -244,7 +237,8 @@ class AdConverter {
     float aref = 0.00488 ;
 
   public:
-    AdConverter(): Resistor1(0), Resistor2(0), adcFix(0) {
+    AdConverter(): Resistor1(0), Resistor2(0), adcFix(0){};
+    void Begin() {
 
       Resistor1 = EEPROM.get(R1ADDR, Resistor1);
       delay(10);
@@ -256,7 +250,7 @@ class AdConverter {
       delay(10);
       if (isnan(Resistor2) || Resistor2 <= 0 || Resistor2 > OVF) {
         Resistor2 = 4550.00;
-      }
+    }
 
       adcFix = EEPROM.get(adcFixADDR, adcFix);
       delay(10);
@@ -320,7 +314,11 @@ class AdConverter {
     }
 };
 //---------------------------------
-void setup() {
+AdConverter adc;
+Battery battery;
+ChargeCycle cycle;
+
+void setup() {  
   //3.5V external reference
   //analogReference(EXTERNAL);
   //Led PWR on cfg
@@ -350,16 +348,15 @@ void setup() {
   display.setTextColor(SSD1306_WHITE);
   delay(100);
 }
-
+//
 void loop() {  
+  adc.Begin();
+  battery.Begin();
+  cycle.Begin();//does nothing
   digitalWrite(outputRelay, LOW);
   digitalWrite(outputExtra, HIGH);
-  
-  Serial.begin(115200);
-  //Class constructor
-  AdConverter adc;
-  Battery battery;
-  ChargeCycle cycle;
+  //Serial.begin(115200);
+
   //"Global" utils
   unsigned long previousMillis = 0;
   byte chargeStatus = 0; //Start System on Status - 0
@@ -372,14 +369,129 @@ void loop() {
     } else {
       cursorDelayTime = 0;
     }
-    if (cursorDelayTime > cursorDelayTimeMenuEntry) {
-      menuEnabled = true;
-      cursorDelayTime = 0;
-      chargeStatus = 0;
+    if (cursorDelayTime > cursorDelayTimeMenuEntry || menuEnabled) {
+      menuEnabled = false; //clear flag
+      cursorDelayTime = 0; //set cursor verifier to 0
+      chargeStatus = 0; //change if needed
+      menuConfig(); //Enter Menu
     }
 
-    //Menu Entry loop
-    while (menuEnabled) {            // Menu CFG Routine -- TODO: change to State Machine -> switch case?
+    //Charger - Startup
+    while (chargeStatus == 0) {     // Self-Test Routine -- TODO: change to State Machine -> switch case?
+      chargeStatus = 1;
+      //load variables or selftest
+    }
+    //Charger - Charge
+    while (chargeStatus == 1) {      // On Charge Routine -- TODO: change to State Machine -> switch case?      
+      digitalWrite(outputRelay, LOW);
+      digitalWrite(outputExtra, HIGH);
+      //Button state checker - menu entry
+      if (digitalRead(buttonEnter) == LOW) {
+        cursorDelayTime++;
+      } else {
+        cursorDelayTime = 0;
+      }
+      if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+        menuEnabled = true;
+        cursorDelayTime = 0;
+        chargeStatus = 0;
+      }
+      //Led system on blink
+      !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+      //Voltage reading and battery setting
+      battery.setVoltage(adc.getReading(8000));
+      //Display routine
+      display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+      display.setTextColor(SSD1306_WHITE);
+      display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
+      display.setTextSize(1);
+      display.setCursor(52, 16);
+      display.println(F("Tempo atual"));
+      display.setCursor(52, 24);
+      display.println(cycle.getCurrentTimeFormated());
+      display.setTextSize(2);
+      display.setCursor(52, 1);
+      display.println(battery.getVoltage(), 2);
+      display.display();
+      /*
+      //Send Json
+      unsigned long currentMillis = millis();
+      if (currentMillis - previousMillis >= 200) {
+        previousMillis = currentMillis;
+        sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+        delay(50);
+      }
+      */
+      //Charge complete checker
+      if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
+        lastTime = cycle.getCurrentTimeFormated();
+        chargeStatus = 2;
+        display.clearDisplay();
+        previousMillis = millis();
+      }
+    }
+    //Charger - Complete
+    while (chargeStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
+      digitalWrite(outputRelay, HIGH);
+      digitalWrite(outputExtra, LOW);
+      //Button state checker - menu entry
+      if (digitalRead(buttonEnter) == LOW) {
+        cursorDelayTime++;
+      } else {
+        cursorDelayTime = 0;
+      }
+      if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+        menuEnabled = true;
+        cursorDelayTime = 0;
+        chargeStatus = 0;
+      }
+      //Display Routine
+      display.setTextSize(1);
+      display.setCursor(1, 1);
+      display.print(F("Completa: ciclo "));
+      display.print(cycle.getCurrentCycle());
+      display.setTextSize(2);
+      display.setCursor(1, 15);
+      display.println(lastTime);
+      display.display();
+      battery.setVoltage(adc.getReading(8000));
+      /*
+      //Send Json
+      unsigned long currentMillis = millis();
+      if (currentMillis - previousMillis >= 200) {
+        previousMillis = currentMillis;
+        sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
+        delay(50);
+      }
+      */
+      //Start Voltage checker
+      if (battery.getStartVoltage() > battery.getVoltage()) {
+        cycle.addCurrentCycle();
+        chargeStatus = 1;
+        display.clearDisplay();
+        cycle.setOffsetMillis(millis());
+      }
+    }
+
+  }
+   
+}//Loop here
+// 
+/*
+void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus) {
+  StaticJsonDocument<96> doc;
+  char bufferArr[6];
+  dtostrf(batteryVoltage, 4, 2, bufferArr);
+  doc["batteryVoltage"] = bufferArr;
+  doc["chargeTime"] = cycleTime;
+  doc["currentCycle"] = cycleCurrent;
+  doc["chargeStatus"] = cycleStatus;
+  serializeJsonPretty(doc, Serial);
+  Serial.println(); // make correct exibition in terminal - remove when sending to a programm
+}
+*/
+void menuConfig(){
+  //Menu Entry loop            // Menu CFG Routine -- TODO: change to State Machine -> switch case?
       uint8_t menuUse = 0;
       uint8_t menuCursorPosition = 0;
       uint8_t menuCursorPositionInsideMenu = 0;
@@ -392,7 +504,7 @@ void loop() {
       display.clearDisplay();
       display.display();
       delay(1000); //make small delay for the user to release the Enter button
-      while (menuEnabled) {
+      while (true) {
         //Page 1
         while (menuPage == 0) {
           //Menu display - necessary here for correct exhibition after the hover animation
@@ -460,7 +572,8 @@ void loop() {
                   menuPage = 5; //number higher just to escape menu page loop
                   cursorDelayTime = 0;
                   menuEnabled = false;
-                  display.clearDisplay();                
+                  display.clearDisplay();  
+                  return;//exit function              
               }
 
               break;
@@ -1156,100 +1269,5 @@ void loop() {
           }
         }
       }
-    }
-    //Charger - Startup
-    while (chargeStatus == 0) {     // Self-Test Routine -- TODO: change to State Machine -> switch case?
-      chargeStatus = 1;
-      //load variables or selftest
-    }
-    //Charger - Charge
-    while (chargeStatus == 1) {      // On Charge Routine -- TODO: change to State Machine -> switch case?      
-      digitalWrite(outputRelay, LOW);
-      digitalWrite(outputExtra, HIGH);
-      //Button state checker - menu entry
-      if (digitalRead(buttonEnter) == LOW) {
-        cursorDelayTime++;
-        Serial.println("Hello");
-      } else {
-        cursorDelayTime = 0;
-      }
-      if (cursorDelayTime > cursorDelayTimeMenuEntry) {
-        menuEnabled = true;
-        cursorDelayTime = 0;
-        chargeStatus = 0;
-      }
-      //Led system on blink
-      !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
-      //Voltage reading and battery setting
-      battery.setVoltage(adc.getReading(8000));
-      //Display routine
-      display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-      display.setTextColor(SSD1306_WHITE);
-      display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
-      display.setTextSize(1);
-      display.setCursor(52, 16);
-      display.println(F("Tempo atual"));
-      display.setCursor(52, 24);
-      display.println(cycle.getCurrentTimeFormated());
-      display.setTextSize(2);
-      display.setCursor(52, 1);
-      display.println(battery.getVoltage(), 2);
-      display.display();
-      //Send Json
-      unsigned long currentMillis = millis();
-      if (currentMillis - previousMillis >= 200) {
-        previousMillis = currentMillis;
-        sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
-        delay(50);
-      }
-      //Charge complete checker
-      if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
-        lastTime = cycle.getCurrentTimeFormated();
-        chargeStatus = 2;
-        display.clearDisplay();
-        previousMillis = millis();
-      }
-    }
-    //Charger - Complete
-    while (chargeStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
-      digitalWrite(outputRelay, HIGH);
-      digitalWrite(outputExtra, LOW);
-      //Button state checker - menu entry
-      if (digitalRead(buttonEnter) == LOW) {
-        cursorDelayTime++;
-      } else {
-        cursorDelayTime = 0;
-      }
-      if (cursorDelayTime > cursorDelayTimeMenuEntry) {
-        menuEnabled = true;
-        cursorDelayTime = 0;
-        chargeStatus = 0;
-      }
-      //Display Routine
-      display.setTextSize(1);
-      display.setCursor(1, 1);
-      display.print(F("Completa: ciclo "));
-      display.print(cycle.getCurrentCycle());
-      display.setTextSize(2);
-      display.setCursor(1, 15);
-      display.println(lastTime);
-      display.display();
-      battery.setVoltage(adc.getReading(8000));
-      //Send Json
-      unsigned long currentMillis = millis();
-      if (currentMillis - previousMillis >= 200) {
-        previousMillis = currentMillis;
-        sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
-        delay(50);
-      }
-      //Start Voltage checker
-      if (battery.getStartVoltage() > battery.getVoltage()) {
-        cycle.addCurrentCycle();
-        chargeStatus = 1;
-        display.clearDisplay();
-        cycle.setOffsetMillis(millis());
-      }
-    }
-
-  } //Loop here
 }
+//
