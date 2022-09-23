@@ -26,7 +26,7 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define LOGO_HEIGHT   32
 #define LOGO_WIDTH    128
-//LOGO IMAGE
+//Logo image
 static const unsigned char PROGMEM logo_bmp[] =
 { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x70, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x78, 0x0e,
@@ -61,6 +61,12 @@ static const unsigned char PROGMEM logo_bmp[] =
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
+//Menu Strings
+const char *menuOptions[] = {
+  "Menu Prog. Sair", "1 - V de REcarga","2 - V final de carga",
+  "3 - T maximo de carga", "4 - Corrigir ADC", "5 - Setar R1",
+  "6 - Setar R2","7 - Pre-Cfg", "24V", "36V", "48V"
+};
 //ADC CFG
 #define ADC_CH  A0
 //Digital CFG
@@ -83,6 +89,7 @@ int adcFixADDR = 60;
 //------------------------
 //void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
 void menuConfig();
+void displayCall();
 
 class MenuCursor{
   private:
@@ -615,6 +622,22 @@ void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, St
 }
 */
 
+void displayCall(bool clearDisplay = false, uint8_t x = 1, uint8_t y = 1, bool invertPixels = false, uint8_t size = 1) {
+  //Color definition, default = white font and black screen
+  uint8_t colorOnPixels = SSD1306_WHITE;
+  uint8_t colorOffPixels = SSD1306_BLACK;
+  if(invertPixels) {
+    colorOnPixels = SSD1306_BLACK;
+    colorOffPixels = SSD1306_WHITE;
+  }
+  if(clearDisplay) {
+    display.clearDisplay();
+  }
+  display.setTextSize(size);
+  display.setTextColor(colorOnPixels,colorOffPixels);
+  display.setCursor(x,y);  
+}
+
 void menuConfig(){
   uint8_t menuPage = 0;
   display.clearDisplay();
@@ -624,26 +647,22 @@ void menuConfig(){
     //Page 1
     while (menuPage == 0) {
       //Menu display - necessary here for correct exhibition after the hover animation
-      display.clearDisplay();
-      display.setTextSize(1);
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK); //change back to original color, after hover animation has set the inverse
-      display.setCursor(1, 1);
-      display.print(F("Menu Prog. Sair"));
-      display.setCursor(1, 12);
-      display.print(F("1 - V de REcarga"));
-      display.setCursor(1, 22);
-      display.print(F("2 - V final de carga"));
-      display.setCursor(120, 1);
+      displayCall(true, 1, 1);
+      display.print(menuOptions[0]);
+      displayCall(false, 1, 12);
+      display.print(menuOptions[1]);
+      displayCall(false, 1, 22); 
+      display.print(menuOptions[2]);     
+      displayCall(false, 120, 1);
       display.print(menuCursor.getMenuCursorPosition());
       //Button state checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
       //Menu Selection
       switch (menuCursor.getMenuCursorPosition()) {
         case 0: //Exit CFG menu
-          //Hover animation
-          display.setCursor(1, 1);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation setter, change background to white and font to black
-          display.print(F("Menu Prog. Sair"));
+          //Hover animation          
+          displayCall(false, 1, 1, true);
+          display.print(menuOptions[0]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) { 
@@ -655,15 +674,12 @@ void menuConfig(){
 
         case 1: //Set charger start voltage Value
           //Hover animation
-          display.setCursor(1, 12);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-          display.print(F("1 - V de REcarga"));
+          displayCall(false, 1, 12, true);
+          display.print(menuOptions[1]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            display.clearDisplay();
-            display.setCursor(1, 1);
-            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            displayCall(true, 1, 1, false);
             display.print(F("Valor atual:"));
             display.print(battery.getStartVoltage());
             display.display();
@@ -685,15 +701,12 @@ void menuConfig(){
 
         case 2: //Set charger end voltage Value
           //Hover animation
-          display.setCursor(1, 22);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-          display.print(F("2 - V final de carga"));
+          displayCall(false, 1, 22, true);
+          display.print(menuOptions[2]);
           display.display();             
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            display.clearDisplay();
-            display.setCursor(1, 1);
-            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            displayCall(true, 1, 1, false);
             display.print(F("Valor Atual:"));
             display.print(battery.getEndVoltage());
             display.display();
@@ -724,15 +737,13 @@ void menuConfig(){
     //Page 2
     while (menuPage == 1) {
       //Menu display
-      display.clearDisplay();
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      display.setCursor(1, 1);
-      display.print(F("3 - T maximo de carga"));
-      display.setCursor(1, 12);
-      display.print(F("4 - Corrigir ADC"));
-      display.setCursor(1, 22);
-      display.print(F("5 - Setar R1"));
-      display.setCursor(120, 12);
+      displayCall(true, 1, 1);
+      display.print(menuOptions[3]);
+      displayCall(false, 1, 12);
+      display.print(menuOptions[4]);
+      displayCall(false, 1, 22); 
+      display.print(menuOptions[5]);     
+      displayCall(false, 120, 1);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -743,16 +754,13 @@ void menuConfig(){
           break;
 
         case 3: //Set charging maximum time Value
-          //Hover animation
-          display.setCursor(1, 1);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-          display.print(F("3 - T maximo de carga"));
+          //Hover animation               
+          displayCall(false, 1, 1, true);
+          display.print(menuOptions[3]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            display.clearDisplay();
-            display.setCursor(1, 1);
-            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            displayCall(true, 1, 1, false);
             display.print(F("Valor atual em Horas:"));
             display.print(battery.getMaxChargeTime());
             display.display();
@@ -773,16 +781,13 @@ void menuConfig(){
           break;
 
         case 4: //Set Adc fix Value
-          //Hover animation
-          display.setCursor(1, 12);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
-          display.print(F("4 - Corrigir ADC"));
+          //Hover animation     
+          displayCall(false, 1, 12, true);
+          display.print(menuOptions[4]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            display.clearDisplay();
-            display.setCursor(1, 1);
-            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
+            displayCall(true, 1, 1, false);  //Animation remove
             display.print(F("Valor em % multiplicado por 1000:"));
             display.setCursor(1, 22);
             display.print(adc.getAdcFix() * 1000);
@@ -805,15 +810,13 @@ void menuConfig(){
 
         case 5: //Set Adc R1 Value
           //Hover animation
-          display.setCursor(1, 22);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-          display.print(F("5 - Setar R1"));
+               
+          displayCall(false, 1, 22, true);
+          display.print(menuOptions[5]);
           display.display(); 
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            display.clearDisplay();
-            display.setCursor(1, 1);
-            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            displayCall(true, 1, 1, false);
             display.print(F("Valor Atual:"));
             display.print(adc.getR1());
             display.display();
@@ -844,13 +847,11 @@ void menuConfig(){
     //Page 3
     while (menuPage == 2) {          
       //Menu display
-      display.clearDisplay();
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      display.setCursor(1, 1);
-      display.print(F("6 - Setar R2"));
-      display.setCursor(1, 12);
-      display.print(F("7 - Pre-Cfg"));
-      display.setCursor(120, 1);
+      displayCall(true, 1, 1);
+      display.print(menuOptions[6]);
+      displayCall(false, 1, 12);
+      display.print(menuOptions[7]);    
+      displayCall(false, 120, 1);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -861,16 +862,13 @@ void menuConfig(){
           break;
 
         case 6: //Set Adc R2 Value
-          //Hover animation
-          display.setCursor(1, 1);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-          display.print(F("6 - Setar R2"));
+          //Hover animation               
+          displayCall(false, 1, 1, true);
+          display.print(menuOptions[6]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {                
-            display.clearDisplay();
-            display.setCursor(1, 1);
-            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            displayCall(true, 1, 1, false);
             display.print(F("Valor Atual:"));
             display.print(adc.getR2());
             display.display();
@@ -891,10 +889,9 @@ void menuConfig(){
           break;
 
         case 7: //Set pre defined values for 12v -24v - 36v - 48v
-          //Hover animation
-          display.setCursor(1, 12);
-          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-          display.print(F("7 - Pre-Cfg"));
+          //Hover animation               
+          displayCall(false, 1, 12, true);
+          display.print(menuOptions[7]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
