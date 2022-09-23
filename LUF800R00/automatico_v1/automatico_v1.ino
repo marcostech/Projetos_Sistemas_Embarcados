@@ -62,10 +62,25 @@ static const unsigned char PROGMEM logo_bmp[] =
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 //Menu Strings
+// [0] = "Menu Prog. Sair"
+// [1] = "1 - V de REcarga"
+// [2] = "2 - V final de carga"
+// [3] = "3 - T maximo de carga"
+// [4] = "4 - Corrigir ADC"
+// [5] = "5 - Setar R1"
+// [6] = "6 - Setar R2"
+// [7] = "7 - Pre-Cfg" 
+// [8] = "1 - 24V"
+// [9] = "2 - 36V"
+// [10] = "3 - 48V",
+// [11] = "Valor atual: "
+// [12] = "Valor atual em Horas:"
+// [13] = "Valor em % multiplicado por 1000:"
 const char *menuOptions[] = {
   "Menu Prog. Sair", "1 - V de REcarga","2 - V final de carga",
   "3 - T maximo de carga", "4 - Corrigir ADC", "5 - Setar R1",
-  "6 - Setar R2","7 - Pre-Cfg", "24V", "36V", "48V"
+  "6 - Setar R2","7 - Pre-Cfg", "1 - 24V", "2 - 36V", "3 - 48V",
+  "Valor atual: ", "Valor atual em Horas:" , "Valor em % multiplicado por 1000:"
 };
 //ADC CFG
 #define ADC_CH  A0
@@ -581,10 +596,14 @@ void loop() {
       display.setCursor(1, 1);
       display.print(F("Completa: ciclo "));
       display.print(cycle.getCurrentCycle());
-      display.setTextSize(2);
-      display.setCursor(1, 15);
-      display.println(lastTime);
+      // display.setTextSize(2);
+      // display.setCursor(1, 15);
+      // display.println(lastTime);      
+      display.setCursor(1, 12);
+      display.println(battery.getVoltage());
+      display.print(battery.getStartVoltage());
       display.display();
+
       battery.setVoltage(adc.getReading(8000));
       /*
       //Send Json
@@ -596,7 +615,7 @@ void loop() {
       }
       */
       //Start Voltage checker
-      if (battery.getStartVoltage() > battery.getVoltage()) {
+      if (battery.getVoltage() < battery.getStartVoltage()) { //TODO Correct restart condition
         cycle.addCurrentCycle();
         chargeStatus = 1;
         display.clearDisplay();
@@ -621,8 +640,18 @@ void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, St
   Serial.println(); // make correct exibition in terminal - remove when sending to a programm
 }
 */
-
-void displayCall(bool clearDisplay = false, uint8_t x = 1, uint8_t y = 1, bool invertPixels = false, uint8_t size = 1) {
+//Parameter 1 set a display.clearDisplay() command - boolean
+//Parameter 2 set the X screen position cursor - byte
+//Parameter 3 set the Y screen position cursor - byte
+//Parameter 4 invert the font color - boolean -> white on background and black on font
+//Parameter 5 set de font size -> byte
+void displayCall(
+  bool clearDisplay = false,
+  uint8_t x = 1,
+  uint8_t y = 1,
+  bool invertPixels = false,
+  uint8_t size = 1
+     ) {
   //Color definition, default = white font and black screen
   uint8_t colorOnPixels = SSD1306_WHITE;
   uint8_t colorOffPixels = SSD1306_BLACK;
@@ -653,7 +682,7 @@ void menuConfig(){
       display.print(menuOptions[1]);
       displayCall(false, 1, 22); 
       display.print(menuOptions[2]);     
-      displayCall(false, 120, 1);
+      displayCall(false, 120, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button state checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -680,7 +709,7 @@ void menuConfig(){
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
             displayCall(true, 1, 1, false);
-            display.print(F("Valor atual:"));
+            display.print(menuOptions[11]);
             display.print(battery.getStartVoltage());
             display.display();
             //Button state checker
@@ -707,7 +736,7 @@ void menuConfig(){
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
             displayCall(true, 1, 1, false);
-            display.print(F("Valor Atual:"));
+            display.print(menuOptions[11]);
             display.print(battery.getEndVoltage());
             display.display();
             //Button state checker
@@ -743,7 +772,7 @@ void menuConfig(){
       display.print(menuOptions[4]);
       displayCall(false, 1, 22); 
       display.print(menuOptions[5]);     
-      displayCall(false, 120, 1);
+      displayCall(false, 120, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -761,7 +790,7 @@ void menuConfig(){
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
             displayCall(true, 1, 1, false);
-            display.print(F("Valor atual em Horas:"));
+            display.print(menuOptions[12]);
             display.print(battery.getMaxChargeTime());
             display.display();
             //Button state checker
@@ -788,9 +817,11 @@ void menuConfig(){
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
             displayCall(true, 1, 1, false);  //Animation remove
-            display.print(F("Valor em % multiplicado por 1000:"));
+            display.print(menuOptions[13]);
             display.setCursor(1, 22);
-            display.print(adc.getAdcFix() * 1000);
+            display.print(adc.getAdcFix() * 1000);            
+            display.setCursor(28, 22);
+            display.print(adc.getReading(800), 2);
             display.display();
             //Button state checker
             if (menuCursor.readPress(30) == 1) {
@@ -816,9 +847,11 @@ void menuConfig(){
           display.display(); 
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            displayCall(true, 1, 1, false);
-            display.print(F("Valor Atual:"));
-            display.print(adc.getR1());
+            displayCall(true, 1, 1, false);            
+            display.print(menuOptions[11]);
+            display.print(adc.getR1());            
+            display.setCursor(28, 22);
+            display.print(adc.getReading(800), 2);
             display.display();
             //Button state checker
             if (menuCursor.readPress(30) == 1) {
@@ -851,7 +884,7 @@ void menuConfig(){
       display.print(menuOptions[6]);
       displayCall(false, 1, 12);
       display.print(menuOptions[7]);    
-      displayCall(false, 120, 1);
+      displayCall(false, 120, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -869,8 +902,10 @@ void menuConfig(){
           //Enter Menu
           while (menuCursor.getMenuFlag()) {                
             displayCall(true, 1, 1, false);
-            display.print(F("Valor Atual:"));
-            display.print(adc.getR2());
+            display.print(menuOptions[11]);
+            display.print(adc.getR2());            
+            display.setCursor(28, 22);
+            display.print(adc.getReading(800), 2);
             display.display();
             //Button state checker
             if (menuCursor.readPress(30) == 1) {
@@ -895,22 +930,19 @@ void menuConfig(){
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            menuCursor.updateCursor(menuCursor.readPress(20), true);
-            display.clearDisplay();
-            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-            display.setCursor(1, 1);
-            display.print(F("24V"));
-            display.setCursor(1, 12);
-            display.print(F("36V"));
-            display.setCursor(1, 22);
-            display.print(F("48V"));
+            menuCursor.updateCursor(menuCursor.readPress(20), true);            
+            displayCall(true, 1, 1);
+            display.print(menuOptions[8]);
+            displayCall(false, 1, 12);
+            display.print(menuOptions[9]);
+            displayCall(false, 1, 22);
+            display.print(menuOptions[10]);
             //Button state checker
             switch (menuCursor.getCursorPositionInsideMenu()) {
               case 0: //Set pre defined 24v
                 //Hover animation
-                display.setCursor(1, 1);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-                display.print(F("24V"));
+                displayCall(false, 1, 1, true);
+                display.print(menuOptions[8]);
                 display.display();
                 //Enter Menu
                 while (menuCursor.getSubMenuFlag()) {
@@ -926,9 +958,8 @@ void menuConfig(){
 
               case 1: //Set pre defined 36v
                 //Hover animation
-                display.setCursor(1, 12);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-                display.print(F("36V"));
+                displayCall(false, 1, 12, true);
+                display.print(menuOptions[9]);
                 display.display();
                 //Enter Menu
                 while (menuCursor.getSubMenuFlag()) {
@@ -944,9 +975,8 @@ void menuConfig(){
 
               case 2: //Set pre defined 48v
                 //Hover animation
-                display.setCursor(1, 22);
-                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-                display.print(F("48V"));
+                displayCall(false, 1, 22, true);
+                display.print(menuOptions[10]);
                 display.display();
                 //Enter Menu
                 while (menuCursor.getSubMenuFlag()) {
