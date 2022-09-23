@@ -91,16 +91,27 @@ void menuConfig();
 class MenuCursor{
   private:
     uint8_t menuCursorPosition;
+    uint8_t menuCursorPositionInsideMenu;
     bool menuEntryFlag;
     bool menuSetFlag;
+    bool subMenuEntryFlag;
+    bool subMenuSetFlag;
+    bool insideMenu;
 
   public:
-    MenuCursor():menuCursorPosition(0),menuEntryFlag(false),menuSetFlag(false){};
+    MenuCursor():
+    menuCursorPosition(0),
+    menuCursorPositionInsideMenu(0),
+    insideMenu(false),
+    menuEntryFlag(false),
+    subMenuEntryFlag(false){};
 
-    void clear() {
+    void clear() {      
       menuCursorPosition = 0;
+      menuCursorPositionInsideMenu = 0;
       menuEntryFlag = false;
-      menuSetFlag = false;
+      insideMenu = false;      
+      subMenuEntryFlag = false;
     }
 
     uint8_t readPress(uint8_t detectWindow) {
@@ -138,20 +149,36 @@ class MenuCursor{
       return keyPressed;
     }
 
-    void updateCursor(uint8_t keyPressed) {
-      //3 = Down / 2 = Up / 1 = Menu
+    void updateCursor(uint8_t keyPressed, bool insideMenu) {
+      //3 = Down / 2 = Up / 1 = Menu      
       if (keyPressed == 1) {        
-        if(menuEntryFlag) {
+        if(!insideMenu) {
+          if(menuEntryFlag) {
           menuEntryFlag = false;
         } else {
           menuEntryFlag = true;
           }
+        } else {
+          if(subMenuEntryFlag) {
+          subMenuEntryFlag = false;
+        } else {
+          subMenuEntryFlag = true;
+          }
+        }
       }  
       if(keyPressed == 2) {
-        menuCursorPosition++;
+        if(!insideMenu) {
+          menuCursorPosition++;
+        } else {
+          menuCursorPositionInsideMenu++;
+        }
       }  
       if(keyPressed == 3 && menuCursorPosition > 0) {
-        menuCursorPosition--;          
+        if(!insideMenu) {
+          menuCursorPosition--;
+        } else {
+          menuCursorPositionInsideMenu--;
+        }      
       }
     }
 
@@ -159,9 +186,17 @@ class MenuCursor{
       return menuCursorPosition;
     }
 
-    uint8_t setMenuCursorPosition(uint8_t newPosition){
+    void setMenuCursorPosition(uint8_t newPosition){
       menuCursorPosition = newPosition;
     } 
+
+    uint8_t getCursorPositionInsideMenu(){
+      return menuCursorPositionInsideMenu;
+    }
+
+    uint8_t setCursorPositionInsideMenu(uint8_t newPosition){
+      menuCursorPositionInsideMenu = newPosition;
+    }
 
     bool getMenuFlag() {
       return menuEntryFlag;
@@ -169,6 +204,14 @@ class MenuCursor{
 
     void clearMenuFlag(){
       menuEntryFlag = false;
+    }
+
+    bool getSubMenuFlag(){  
+      return subMenuEntryFlag;
+    }
+
+    bool clearSubMenuFlag(){  
+      subMenuEntryFlag = false;
     }
 
 };
@@ -561,8 +604,7 @@ void loop() {
 
   }
    
-}//Loop here
-// 
+}
 
 /*
 void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus) {
@@ -579,696 +621,374 @@ void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, St
 */
 
 void menuConfig(){
-  //Menu Entry loop            // Menu CFG Routine -- TODO: change to State Machine -> switch case?
-      // uint8_t menuUse = 0;
-      // uint8_t menuCursorPosition = 0;
-      // uint8_t menuCursorPositionInsideMenu = 0;
-      uint8_t menuPage = 0;
-      // uint8_t cursorDelayTimeUp = 0; //buffer variable to store input data
-      // uint8_t cursorDelayTimeDown = 0; ////buffer variable to store input data
-      // uint8_t cursorDelayTimeInterval = 1; //interval for accept the input
-      // uint8_t cursorDelayTimeIntervalMenu = 2; //interval for accept the input
-
+  uint8_t menuPage = 0;
+  display.clearDisplay();
+  display.display();
+  delay(1000); //make small delay for the user to release the Enter button
+  while (true) {
+    //Page 1
+    while (menuPage == 0) {
+      !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+      //Menu display - necessary here for correct exhibition after the hover animation
       display.clearDisplay();
-      display.display();
-      delay(1000); //make small delay for the user to release the Enter button
-      while (true) {
-        //Page 1
-        while (menuPage == 0) {
-          !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
-          //Menu display - necessary here for correct exhibition after the hover animation
-          menuCursor.updateCursor(menuCursor.readPress(10));
-          display.clearDisplay();
-          display.setTextSize(1);
-          display.setTextColor(SSD1306_WHITE, SSD1306_BLACK); //change back to original color, after hover animation has set the inverse
+      display.setTextSize(1);
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK); //change back to original color, after hover animation has set the inverse
+      display.setCursor(1, 1);
+      display.print(F("Menu Prog. Sair"));
+      display.setCursor(1, 12);
+      display.print(F("1 - V de REcarga"));
+      display.setCursor(1, 22);
+      display.print(F("2 - V final de carga"));
+      display.setCursor(120, 1);
+      display.print(menuCursor.getMenuCursorPosition());
+      //Button state checker
+      menuCursor.updateCursor(menuCursor.readPress(20), false);
+      //Menu Selection
+      switch (menuCursor.getMenuCursorPosition()) {
+        case 0: //Exit CFG menu
+          //Hover animation
           display.setCursor(1, 1);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation setter, change background to white and font to black
           display.print(F("Menu Prog. Sair"));
-          display.setCursor(1, 12);
-          display.print(F("1 - V de REcarga"));
-          display.setCursor(1, 22);
-          display.print(F("2 - V final de carga"));
-          display.setCursor(120, 1);
-          display.print(menuCursor.getMenuCursorPosition());
-          //Button state checker
-          //Menu Selection
-          switch (menuCursor.getMenuCursorPosition()) {
-            case 0: //Exit CFG menu
-              //Hover animation
-              display.setCursor(1, 1);
-              display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation setter, change background to white and font to black
-              display.print(F("Menu Prog. Sair"));
-              display.display();
-              //Enter Menu
-              while (menuCursor.getMenuFlag()) { 
-                display.clearDisplay();
-                menuCursor.clear();  
-                return; //exit function              
-              }
-              break;
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) { 
+            display.clearDisplay();
+            menuCursor.clear();  
+            return; //exit function              
+          }
+          break;
 
-            case 1: //Set charger start voltage Value
-              //Hover animation
+        case 1: //Set charger start voltage Value
+          //Hover animation
+          display.setCursor(1, 12);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+          display.print(F("1 - V de REcarga"));
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            display.clearDisplay();
+            display.setCursor(1, 1);
+            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            display.print(F("Valor atual:"));
+            display.print(battery.getStartVoltage());
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              battery.setStartVoltage(battery.getStartVoltage() + 0.05);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              battery.setStartVoltage(battery.getStartVoltage() - 0.05);                  
+            }
+          }
+          break;
+
+        case 2: //Set charger end voltage Value
+          //Hover animation
+          display.setCursor(1, 22);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+          display.print(F("2 - V final de carga"));
+          display.display();             
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            display.clearDisplay();
+            display.setCursor(1, 1);
+            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            display.print(F("Valor Atual:"));
+            display.print(battery.getEndVoltage());
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              battery.setEndVoltage(battery.getEndVoltage() + 0.05);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              battery.setEndVoltage(battery.getEndVoltage() - 0.05);                  
+            }
+          }              
+          break;
+
+        case 3:
+          menuPage = 1;
+          break;
+
+        default:
+          break;
+      }      
+    }
+    //Page 2
+    while (menuPage == 1) {
+      //Menu display
+      display.clearDisplay();
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+      display.setCursor(1, 1);
+      display.print(F("3 - T maximo de carga"));
+      display.setCursor(1, 12);
+      display.print(F("4 - Corrigir ADC"));
+      display.setCursor(1, 22);
+      display.print(F("5 - Setar R1"));
+      display.setCursor(120, 12);
+      display.print(menuCursor.getMenuCursorPosition());
+      //Button Checker
+      menuCursor.updateCursor(menuCursor.readPress(20), false);
+      //Menu Selection
+      switch (menuCursor.getMenuCursorPosition()) {
+        case 2:
+          menuPage = 0;
+          break;
+
+        case 3: //Set charging maximum time Value
+          //Hover animation
+          display.setCursor(1, 1);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+          display.print(F("3 - T maximo de carga"));
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            display.clearDisplay();
+            display.setCursor(1, 1);
+            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            display.print(F("Valor atual em Horas:"));
+            display.print(battery.getMaxChargeTime());
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              battery.setMaxChargeTime(battery.getMaxChargeTime() + 1);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              battery.setMaxChargeTime(battery.getMaxChargeTime() - 1);                  
+            }
+          }
+          break;
+
+        case 4: //Set Adc fix Value
+          //Hover animation
+          display.setCursor(1, 12);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
+          display.print(F("4 - Corrigir ADC"));
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            display.clearDisplay();
+            display.setCursor(1, 1);
+            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
+            display.print(F("Valor em % multiplicado por 1000:"));
+            display.setCursor(1, 22);
+            display.print(adc.getAdcFix() * 1000);
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              adc.setAdcFix(adc.getAdcFix() + 0.001);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              adc.setAdcFix(adc.getAdcFix() - 0.001);                  
+            }
+          }
+          break;
+
+        case 5: //Set Adc R1 Value
+          //Hover animation
+          display.setCursor(1, 22);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+          display.print(F("5 - Setar R1"));
+          display.display(); 
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            display.clearDisplay();
+            display.setCursor(1, 1);
+            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            display.print(F("Valor Atual:"));
+            display.print(adc.getR1());
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              adc.setR1(adc.getR1() + 100);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              adc.setR1(adc.getR1() - 100);                  
+            }
+          }
+          break;
+
+        case 6:
+          menuPage = 2;
+          break;
+
+        default:
+          break;
+      }
+    }
+    //Page 3
+    while (menuPage == 2) {          
+      //Menu display
+      display.clearDisplay();
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+      display.setCursor(1, 1);
+      display.print(F("6 - Setar R2"));
+      display.setCursor(1, 12);
+      display.print(F("7 - Pre-Cfg"));
+      display.setCursor(120, 1);
+      display.print(menuCursor.getMenuCursorPosition());
+      //Button Checker
+      menuCursor.updateCursor(menuCursor.readPress(20), false);
+      //Menu Selection
+      switch (menuCursor.getMenuCursorPosition()) {
+        case 5:
+          menuPage = 1;
+          break;
+
+        case 6: //Set Adc R2 Value
+          //Hover animation
+          display.setCursor(1, 1);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+          display.print(F("6 - Setar R2"));
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {                
+            display.clearDisplay();
+            display.setCursor(1, 1);
+            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            display.print(F("Valor Atual:"));
+            display.print(adc.getR2());
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              adc.setR2(adc.getR2() + 50);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              adc.setR2(adc.getR2() - 50);                  
+            }
+          }
+          break;
+
+        case 7: //Set pre defined values for 12v -24v - 36v - 48v
+          //Hover animation
+          display.setCursor(1, 12);
+          display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+          display.print(F("7 - Pre-Cfg"));
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            menuCursor.updateCursor(menuCursor.readPress(20), true);
+            display.clearDisplay();
+            display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+            display.setCursor(1, 1);
+            display.print(F("24V"));
+            display.setCursor(1, 12);
+            display.print(F("36V"));
+            display.setCursor(1, 22);
+            display.print(F("48V"));
+            //Button state checker
+            switch (menuCursor.getCursorPositionInsideMenu()) {
+              case 0: //Set pre defined 24v
+                //Hover animation
+                display.setCursor(1, 1);
+                display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+                display.print(F("24V"));
+                display.display();
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set 24V
+                  battery.setStartVoltage(23.6);
+                  battery.setEndVoltage(29.5);
+                  battery.setMaxChargeTime(10);
+
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
+
+              case 1: //Set pre defined 36v
+                //Hover animation
                 display.setCursor(1, 12);
                 display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-                display.print(F("1 - V de REcarga"));
+                display.print(F("36V"));
                 display.display();
-              //Enter Menu
-              while (false) {
-                display.clearDisplay();
-                display.setCursor(1, 1);
-                display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-                display.print(F("Valor atual:"));
-                display.print(battery.getStartVoltage());
-                display.display();
-                //Button state checker
-                if (menuCursor.readPress(10) == 1) {
-                  menuCursor.clearMenuFlag();
-                }                 
-                //Up - set
-                if (menuCursor.readPress(10) == 2) {
-                  battery.setStartVoltage(battery.getStartVoltage() + 0.05);                  
-                }                
-                //Down - set
-                if (menuCursor.readPress(10) == 3) {
-                  battery.setStartVoltage(battery.getStartVoltage() - 0.05);                  
-                }
-              }
-              break;
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set 36V
+                  battery.setStartVoltage(35.4);
+                  battery.setEndVoltage(44.1);
+                  battery.setMaxChargeTime(10);
 
-            case 2: //Set charger end voltage Value
-              //Hover animation
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
+
+              case 2: //Set pre defined 48v
+                //Hover animation
                 display.setCursor(1, 22);
                 display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-                display.print(F("2 - V final de carga"));
+                display.print(F("48V"));
                 display.display();
-              //Button state checker              
-              // //Enter Menu
-              // while (menuUse == 1) {
-              //   display.clearDisplay();
-              //   display.setCursor(1, 1);
-              //   display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-              //   display.print(F("Valor Atual:"));
-              //   display.print(battery.getEndVoltage());
-              //   display.display();
-              //   //Button state checker
-              //   //Enter - checker
-              //   if (digitalRead(buttonEnter) == LOW) {
-              //     cursorDelayTime++;
-              //   } else {
-              //     cursorDelayTime = 0;
-              //   }
-              //   //Enter - set
-              //   if (cursorDelayTime > cursorDelayTimeIntervalMenu + delayExtra) {
-              //     menuUse = 0;
-              //     menuPage = 0;
-              //     cursorDelayTime = 0;
-              //   }
-              //   //Up - checker
-              //   if (digitalRead(buttonCursorUp) == LOW) {
-              //     cursorDelayTimeUp++;
-              //   } else {
-              //     cursorDelayTimeUp = 0;
-              //   }
-              //   //Up -set
-              //   if (cursorDelayTimeUp > (cursorDelayTimeInterval + delayExtra)) {
-              //     battery.setEndVoltage(battery.getEndVoltage() + 0.05);
-              //     cursorDelayTimeUp = 0;
-              //   }
-              //   //Down - checker
-              //   if (digitalRead(buttonCursorDown) == LOW) {
-              //     cursorDelayTimeDown++;
-              //   } else {
-              //     cursorDelayTimeDown = 0;
-              //   }
-              //   //Down - set
-              //   if (cursorDelayTimeDown > (cursorDelayTimeInterval + delayExtra)) {
-              //     battery.setEndVoltage(battery.getEndVoltage() - 0.05);
-              //     cursorDelayTimeDown = 0;
-              //   }
-              // }
-              //
-               break;
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set 48V
+                  battery.setStartVoltage(47.2);
+                  battery.setEndVoltage(59.5);
+                  battery.setMaxChargeTime(10);
 
-            case 3:
-              menuCursor.setMenuCursorPosition(0);
-              break;
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
 
-            default:
-              break;
+              case 3:
+                menuCursor.clear();
+                menuPage = 0;
+                break;
+
+              default:
+                break;
+            }
           }
-        }
-      //   //Page 2
-      //   while (menuPage == 1) {
-      //     //Button state checker
-      //     //Up - checker
-      //     if (digitalRead(buttonCursorUp) == LOW) {
-      //       cursorDelayTimeUp++;
-      //     } else {
-      //       cursorDelayTimeUp = 0;
-      //     }
-      //     //Up - set
-      //     if (cursorDelayTimeUp > cursorDelayTimeInterval) {
-      //       menuCursorPosition++;
-      //       cursorDelayTimeUp = 0;
-      //     }
-      //     //Down - checker
-      //     if (digitalRead(buttonCursorDown) == LOW) {
-      //       cursorDelayTimeDown++;
-      //     } else {
-      //       cursorDelayTimeDown = 0;
-      //     }
-      //     //Down - set
-      //     if (cursorDelayTimeDown > cursorDelayTimeInterval) {
-      //       if (menuCursorPosition > 0) {
-      //         menuCursorPosition--;
-      //       } else {
-      //         menuCursorPosition = 0;
-      //       }
-      //       cursorDelayTimeDown = 0;
-      //     }
-      //     //Menu display
-      //     display.clearDisplay();
-      //     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      //     display.setCursor(1, 1);
-      //     display.print(F("3 - T maximo de carga"));
-      //     display.setCursor(1, 12);
-      //     display.print(F("4 - Corrigir ADC"));
-      //     display.setCursor(1, 22);
-      //     display.print(F("5 - Setar R1"));
+          break;
 
-      //     switch (menuCursorPosition) {
-      //       case 2:
-      //         menuPage = 0;
-      //         break;
+        case 8:
+          menuCursor.clear();
+          menuPage = 0;
+          break;
 
-      //       case 3: //Set charging maximum time Value
-      //         //Hover animation
-      //         if (menuCursorPosition == 3) {
-      //           display.setCursor(1, 1);
-      //           display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      //           display.print(F("3 - T maximo de carga"));
-      //           display.display();
-      //         }
-      //         //Button state checker
-      //         //Enter - checker
-      //         if (digitalRead(buttonEnter) == LOW) {
-      //           cursorDelayTime++;
-      //         } else {
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter - set
-      //         if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
-      //           menuUse = 1;
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter Menu
-      //         while (menuUse == 1) {
-      //           display.clearDisplay();
-      //           display.setCursor(1, 1);
-      //           display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      //           display.print(F("Valor atual em Horas:"));
-      //           display.print(battery.getMaxChargeTime());
-      //           display.display();
-      //           //Button state checker
-      //           //Enter - checker
-      //           if (digitalRead(buttonEnter) == LOW) {
-      //             cursorDelayTime++;
-      //           } else {
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Enter - set
-      //           if (cursorDelayTime > cursorDelayTimeIntervalMenu + delayExtra) {
-      //             menuUse = 0;
-      //             menuPage = 1;
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Up - checker
-      //           if (digitalRead(buttonCursorUp) == LOW) {
-      //             cursorDelayTimeUp++;
-      //           } else {
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Up - set
-      //           if (cursorDelayTimeUp > (cursorDelayTimeInterval + delayExtra)) {
-      //             battery.setMaxChargeTime(battery.getMaxChargeTime() + 1);
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Down - checker
-      //           if (digitalRead(buttonCursorDown) == LOW) {
-      //             cursorDelayTimeDown++;
-      //           } else {
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //           //Downd - set
-      //           if (cursorDelayTimeDown > (cursorDelayTimeInterval + delayExtra)) {
-      //             battery.setMaxChargeTime(battery.getMaxChargeTime() - 1);
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //         }
-      //         break;
-
-      //       case 4: //Set Adc fix Value
-      //         //Hover animation
-      //         if (menuCursorPosition == 4) {
-      //           display.setCursor(1, 12);
-      //           display.setTextColor(SSD1306_BLACK, SSD1306_WHITE); //Animation set
-      //           display.print(F("4 - Corrigir ADC"));
-      //           display.display();
-      //         }
-      //         //--------------
-      //         //Button state checker
-      //         //Enter - checker
-      //         if (digitalRead(buttonEnter) == LOW) {
-      //           cursorDelayTime++;
-      //         } else {
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter - set
-      //         if (cursorDelayTime > cursorDelayTimeIntervalMenu) {
-      //           menuUse = 1;
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter Menu
-      //         while (menuUse == 1) {
-      //           display.clearDisplay();
-      //           display.setCursor(1, 1);
-      //           display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);  //Animation remove
-      //           display.print(F("Valor em % multiplicado por 1000:"));
-      //           display.setCursor(1, 22);
-      //           display.print(adc.getAdcFix() * 1000);
-      //           display.display();
-      //           //Set value
-      //           //Button state checker
-      //           //Enter - checker
-      //           if (digitalRead(buttonEnter) == LOW) {
-      //             cursorDelayTime++;
-      //           } else {
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Enter - set
-      //           if (cursorDelayTime > cursorDelayTimeIntervalMenu + delayExtra) {
-      //             menuUse = 0;
-      //             menuPage = 1;
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Up - checker
-      //           if (digitalRead(buttonCursorUp) == LOW) {
-      //             cursorDelayTimeUp++;
-      //           } else {
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Up - set
-      //           if (cursorDelayTimeUp > (cursorDelayTimeInterval + delayExtra)) {
-      //             adc.setAdcFix(adc.getAdcFix() + 0.001);
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Down - checker
-      //           if (digitalRead(buttonCursorDown) == LOW) {
-      //             cursorDelayTimeDown++;
-      //           } else {
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //           //Down - set
-      //           if (cursorDelayTimeDown > (cursorDelayTimeInterval + delayExtra)) {
-      //             adc.setAdcFix(adc.getAdcFix() - 0.001);
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //         }
-      //         break;
-
-      //       case 5: //Set Adc R1 Value
-      //         //Hover animation
-      //         if (menuCursorPosition == 5) {
-      //           display.setCursor(1, 22);
-      //           display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      //           display.print(F("5 - Setar R1"));
-      //           display.display();
-      //         }
-      //         //Button state checker
-      //         //Enter - checker
-      //         if (digitalRead(buttonEnter) == LOW) {
-      //           cursorDelayTime++;
-      //         } else {
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter - set
-      //         if (cursorDelayTime > cursorDelayTimeInterval) {
-      //           menuUse = 1;
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter Menu
-      //         while (menuUse == 1) {
-      //           display.clearDisplay();
-      //           display.setCursor(1, 1);
-      //           display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      //           display.print(F("Valor Atual:"));
-      //           display.print(adc.getR1());
-      //           display.display();
-      //           //Button state checker
-      //           //Enter - checker
-      //           if (digitalRead(buttonEnter) == LOW) {
-      //             cursorDelayTime++;
-      //           } else {
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Enter - set
-      //           if (cursorDelayTime > cursorDelayTimeIntervalMenu + delayExtra) {
-      //             menuUse = 0;
-      //             menuPage = 1;
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Up - checker
-      //           if (digitalRead(buttonCursorUp) == LOW) {
-      //             cursorDelayTimeUp++;
-      //           } else {
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Up -set
-      //           if (cursorDelayTimeUp > (cursorDelayTimeInterval + delayExtra)) {
-      //             adc.setR1(adc.getR1() + 100);
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Down - checker
-      //           if (digitalRead(buttonCursorDown) == LOW) {
-      //             cursorDelayTimeDown++;
-      //           } else {
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //           //Down - set
-      //           if (cursorDelayTimeDown > (cursorDelayTimeInterval + delayExtra)) {
-      //             adc.setR1(adc.getR1() - 100);
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //         }
-      //         break;
-
-      //       case 6:
-      //         menuPage = 2;
-      //         break;
-
-      //       default:
-      //         break;
-      //     }
-      //   }
-      //   //Page 3
-      //   while (menuPage == 2) {
-      //     //Button state checker
-      //     //Up - checker
-      //     if (digitalRead(buttonCursorUp) == LOW) {
-      //       cursorDelayTimeUp++;
-      //     } else {
-      //       cursorDelayTimeUp = 0;
-      //     }
-      //     //Up - set
-      //     if (cursorDelayTimeUp > cursorDelayTimeInterval + 2) {
-      //       menuCursorPosition++;
-      //       cursorDelayTimeUp = 0;
-      //     }
-      //     //Down - checker
-      //     if (digitalRead(buttonCursorDown) == LOW) {
-      //       cursorDelayTimeDown++;
-      //     } else {
-      //       cursorDelayTimeDown = 0;
-      //     }
-      //     //Down - set
-      //     if (cursorDelayTimeDown > cursorDelayTimeInterval + 2) {
-      //       if (menuCursorPosition > 0) {
-      //         menuCursorPosition--;
-      //       } else {
-      //         menuCursorPosition = 0;
-      //       }
-      //       cursorDelayTimeDown = 0;
-      //     }
-      //     //Menu display - necessary for animations
-      //     display.clearDisplay();
-      //     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      //     display.setCursor(1, 1);
-      //     display.print(F("6 - Setar R2"));
-      //     display.setCursor(1, 12);
-      //     display.print(F("7 - Pre-Cfg"));
-
-      //     switch (menuCursorPosition) {
-      //       case 5:
-      //         menuPage = 1;
-      //         break;
-
-      //       case 6: //Set Adc R2 Value
-      //         //Hover animation
-      //         if (menuCursorPosition == 6) {
-      //           display.setCursor(1, 1);
-      //           display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      //           display.print(F("6 - Setar R2"));
-      //           display.display();
-      //         }
-      //         //Button state checker
-      //         //Enter - checker
-      //         if (digitalRead(buttonEnter) == LOW) {
-      //           cursorDelayTime++;
-      //         } else {
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter - set
-      //         if (cursorDelayTime > cursorDelayTimeInterval) {
-      //           menuUse = 1;
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter Menu
-      //         while (menuUse == 1) {
-      //           display.clearDisplay();
-      //           display.setCursor(1, 1);
-      //           display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      //           display.print(F("Valor Atual:"));
-      //           display.print(adc.getR2());
-      //           display.display();
-      //           //Button state checker
-      //           //Enter - checker
-      //           if (digitalRead(buttonEnter) == LOW) {
-      //             cursorDelayTime++;
-      //           } else {
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Enter - set
-      //           if (cursorDelayTime > cursorDelayTimeIntervalMenu + delayExtra) {
-      //             menuUse = 0;
-      //             menuPage = 2;
-      //             cursorDelayTime = 0;
-      //           }
-      //           //Up - checker
-      //           if (digitalRead(buttonCursorUp) == LOW) {
-      //             cursorDelayTimeUp++;
-      //           } else {
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Up - set
-      //           if (cursorDelayTimeUp > (cursorDelayTimeInterval + delayExtra)) {
-      //             adc.setR2(adc.getR2() + 50);
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Down - checker
-      //           if (digitalRead(buttonCursorDown) == LOW) {
-      //             cursorDelayTimeDown++;
-      //           } else {
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //           //Down - set
-      //           if (cursorDelayTimeDown > (cursorDelayTimeInterval + delayExtra)) {
-      //             adc.setR2(adc.getR2() - 50);
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //         }
-      //         break;
-
-      //       case 7: //Set pre defined values for 12v -24v - 36v - 48v
-      //         //Hover animation
-      //         if (menuCursorPosition == 7) {
-      //           display.setCursor(1, 12);
-      //           display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      //           display.print(F("7 - Pre-Cfg"));
-      //           display.display();
-      //         }
-      //         //Button state checker
-      //         //Enter - checker
-      //         if (digitalRead(buttonEnter) == LOW) {
-      //           cursorDelayTime++;
-      //         } else {
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter - set
-      //         if (cursorDelayTime > cursorDelayTimeInterval) {
-      //           menuUse = 1;
-      //           cursorDelayTime = 0;
-      //         }
-      //         //Enter Menu
-      //         while (menuUse == 1) {
-      //           //Button State Checker
-      //           //Up - checker
-      //           if (digitalRead(buttonCursorUp) == LOW) {
-      //             cursorDelayTimeUp++;
-      //           } else {
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Up - set
-      //           if (cursorDelayTimeUp > cursorDelayTimeInterval + 2) {
-      //             menuCursorPositionInsideMenu++;
-      //             cursorDelayTimeUp = 0;
-      //           }
-      //           //Down - checker
-      //           if (digitalRead(buttonCursorDown) == LOW) {
-      //             cursorDelayTimeDown++;
-      //           } else {
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //           //Down - set
-      //           if (cursorDelayTimeDown > cursorDelayTimeInterval + 2) {
-      //             if (menuCursorPositionInsideMenu > 0) {
-      //               menuCursorPositionInsideMenu--;
-      //             } else {
-      //               menuCursorPositionInsideMenu = 0;
-      //             }
-      //             cursorDelayTimeDown = 0;
-      //           }
-      //           display.clearDisplay();
-      //           display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-      //           display.setCursor(1, 1);
-      //           display.print(F("24V"));
-      //           display.setCursor(1, 12);
-      //           display.print(F("36V"));
-      //           display.setCursor(1, 22);
-      //           display.print(F("48V"));
-      //           //Button state checker
-      //           switch (menuCursorPositionInsideMenu) {
-      //             case 0: //Set pre defined 24v
-      //               //Hover animation
-      //               if (menuCursorPositionInsideMenu == 0) {
-      //                 display.setCursor(1, 1);
-      //                 display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      //                 display.print(F("24V"));
-      //                 display.display();
-      //               }
-      //               //Button state checker
-      //               //Enter - checker
-      //               if (digitalRead(buttonEnter) == LOW) {
-      //                 cursorDelayTime++;
-      //               } else {
-      //                 cursorDelayTime = 0;
-      //               }
-      //               //Enter - set
-      //               if (cursorDelayTime > cursorDelayTimeInterval + 4) {
-      //                 menuUse = 2;
-      //                 cursorDelayTime = 0;
-      //                 menuCursorPositionInsideMenu = 0;
-      //               }
-      //               //Enter Menu
-      //               while (menuUse == 2) {
-      //                 //Set 24V
-      //                 battery.setStartVoltage(23.6);
-      //                 battery.setEndVoltage(29.5);
-      //                 battery.setMaxChargeTime(10);
-
-      //                 menuUse = 0;
-      //                 cursorDelayTime = 0;
-      //                 menuPage = 0;
-      //                 menuCursorPosition = 0;   
-      //                 menuCursorPositionInsideMenu = 0;
-      //               }
-      //               break;
-
-      //             case 1: //Set pre defined 36v
-      //               //Hover animation
-      //               if (menuCursorPositionInsideMenu == 1) {
-      //                 display.setCursor(1, 12);
-      //                 display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      //                 display.print(F("36V"));
-      //                 display.display();
-      //               }
-      //               //Button state checker
-      //               //Enter - checker
-      //               if (digitalRead(buttonEnter) == LOW) {
-      //                 cursorDelayTime++;
-      //               } else {
-      //                 cursorDelayTime = 0;
-      //               }
-      //               //Enter - set
-      //               if (cursorDelayTime > cursorDelayTimeInterval + 4) {
-      //                 menuUse = 2;
-      //                 cursorDelayTime = 0;
-      //                 menuCursorPositionInsideMenu = 0;
-      //               }
-      //               //Enter Menu
-      //               while (menuUse == 2) {
-      //                 //Set 36V
-      //                 battery.setStartVoltage(35.4);
-      //                 battery.setEndVoltage(44.1);
-      //                 battery.setMaxChargeTime(10);
-
-      //                 menuUse = 0;
-      //                 cursorDelayTime = 0;
-      //                 menuPage = 0;
-      //                 menuCursorPosition = 0;   
-      //                 menuCursorPositionInsideMenu = 0;
-      //               }
-      //               break;
-
-      //             case 2: //Set pre defined 48v
-      //               //Hover animation
-      //               if (menuCursorPositionInsideMenu == 2) {
-      //                 display.setCursor(1, 22);
-      //                 display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      //                 display.print(F("48V"));
-      //                 display.display();
-      //               }
-      //               //Button state checker
-      //               //Enter - checker
-      //               if (digitalRead(buttonEnter) == LOW) {
-      //                 cursorDelayTime++;
-      //               } else {
-      //                 cursorDelayTime = 0;
-      //               }
-      //               //Enter - set
-      //               if (cursorDelayTime > cursorDelayTimeInterval + 4) {
-      //                 menuUse = 2;
-      //                 cursorDelayTime = 0;
-      //                 menuCursorPositionInsideMenu = 0;
-      //               }
-      //               //Enter Menu
-      //               while (menuUse == 2) {
-      //                 //Set 48V
-      //                 battery.setStartVoltage(47.2);
-      //                 battery.setEndVoltage(59.5);
-      //                 battery.setMaxChargeTime(10);
-
-      //                 menuUse = 0;
-      //                 cursorDelayTime = 0;
-      //                 menuPage = 0;
-      //                 menuCursorPosition = 0;                         
-      //                 menuCursorPositionInsideMenu = 0;
-      //               }
-      //               break;
-
-      //             case 3:
-      //               menuUse = 0;
-      //               cursorDelayTime = 0;
-      //               menuPage = 0;
-      //               menuCursorPosition = 0;                    
-      //               menuCursorPositionInsideMenu = 0;
-      //               break;
-
-      //             default:
-      //               break;
-      //           }
-      //         }
-      //         break;
-
-      //       case 8:
-      //         menuPage = 0;
-      //         menuCursorPosition = 0;
-      //         break;
-
-      //       default:
-      //         break;
-      //     }
-      //   }
-      //
-    }
+        default:
+          break;
+      }
+    }      
+  }
 }
 //
