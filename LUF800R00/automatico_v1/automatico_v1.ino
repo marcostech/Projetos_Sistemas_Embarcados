@@ -61,21 +61,17 @@ static const unsigned char PROGMEM logo_bmp[] =
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
-//------------------------
 //ADC CFG
 #define ADC_CH  A0
-//------------------------
 //Digital CFG
 #define buttonCursorDown 2
 #define buttonCursorUp 3
 #define outputRelay 5
 #define buttonEnter 8
 #define outputExtra 10
-uint8_t delayExtra = 1;
+//Menu entry CFG
 uint8_t cursorDelayTime = 0; //buffer variable to store input data
 uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
-boolean  menuEnabled = false; //Start with menu disabled
-//------------------------
 //EEPROM CFG
 const long OVF = 1000000;
 int endVoltageADDR = 10;
@@ -223,8 +219,7 @@ class ChargeCycle  {
     unsigned long  offsetMillis;
 
   public:
-    ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0){};
-    void Begin(){};
+    ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0){};    
 
     String getCurrentTimeFormated () {
       unsigned long currentTimeSeconds = (millis() - offsetMillis ) / 1000; //Test different time scenarios here
@@ -478,10 +473,11 @@ void setup() {
   delay(100);
 }
 //
-void loop() {  
+void loop() { 
+  //Correct init of objects for use with arduino abstractions
   adc.Begin();
   battery.Begin();
-  cycle.Begin();//does nothing
+
   digitalWrite(outputRelay, LOW);
   digitalWrite(outputExtra, HIGH);
   //Serial.begin(115200);
@@ -493,13 +489,12 @@ void loop() {
   //System Lock
   while (true) { //Power On Routine -- TODO: change to State Machina -> switch case?
     //Button state checker - menu entry
-    if (digitalRead(buttonEnter) == LOW) {
+    if (menuCursor.readPress(10) == 1) {
       cursorDelayTime++;
     } else {
       cursorDelayTime = 0;
     }
-    if (cursorDelayTime > cursorDelayTimeMenuEntry || menuEnabled) {
-      menuEnabled = false; //clear flag
+    if (cursorDelayTime > cursorDelayTimeMenuEntry) {      
       cursorDelayTime = 0; //set cursor verifier to 0
       chargeStatus = 0; //change if needed
       menuConfig(); //Enter Menu
@@ -515,15 +510,15 @@ void loop() {
       digitalWrite(outputRelay, LOW);
       digitalWrite(outputExtra, HIGH);
       //Button state checker - menu entry
-      if (digitalRead(buttonEnter) == LOW) {
+      if (menuCursor.readPress(10) == 1) {
         cursorDelayTime++;
       } else {
         cursorDelayTime = 0;
       }
       if (cursorDelayTime > cursorDelayTimeMenuEntry) {
-        menuEnabled = true;
         cursorDelayTime = 0;
         chargeStatus = 0;
+        menuConfig();
       }
       //Led system on blink
       !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
@@ -564,15 +559,15 @@ void loop() {
       digitalWrite(outputRelay, HIGH);
       digitalWrite(outputExtra, LOW);
       //Button state checker - menu entry
-      if (digitalRead(buttonEnter) == LOW) {
+      if (menuCursor.readPress(10) == 1) {
         cursorDelayTime++;
       } else {
         cursorDelayTime = 0;
       }
       if (cursorDelayTime > cursorDelayTimeMenuEntry) {
-        menuEnabled = true;
         cursorDelayTime = 0;
         chargeStatus = 0;
+        menuConfig();
       }
       //Display Routine
       display.setTextSize(1);
@@ -628,7 +623,6 @@ void menuConfig(){
   while (true) {
     //Page 1
     while (menuPage == 0) {
-      !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
       //Menu display - necessary here for correct exhibition after the hover animation
       display.clearDisplay();
       display.setTextSize(1);
