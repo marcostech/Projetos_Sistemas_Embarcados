@@ -591,20 +591,19 @@ void loop() {
         chargeStatus = 0;
         menuConfig();
       }
+      
+      battery.setVoltage(adc.getReading(4000));
       //Display Routine
+      display.clearDisplay();
       display.setTextSize(1);
       display.setCursor(1, 1);
       display.print(F("Completa: ciclo "));
       display.print(cycle.getCurrentCycle());
-      // display.setTextSize(2);
-      // display.setCursor(1, 15);
-      // display.println(lastTime);      
-      display.setCursor(1, 12);
-      display.println(battery.getVoltage());
-      display.print(battery.getStartVoltage());
+      display.setTextSize(2);
+      display.setCursor(1, 15);
+      display.println(lastTime);
       display.display();
 
-      battery.setVoltage(adc.getReading(8000));
       /*
       //Send Json
       unsigned long currentMillis = millis();
