@@ -1,4 +1,5 @@
 {
     "board": "arduino:avr:nano",
-    "port": "COM3"
+    "port": "COM3",
+    "sketch": "automatico_v2\\automatico_v2.ino"
 }

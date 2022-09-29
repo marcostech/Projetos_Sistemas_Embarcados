@@ -61,26 +61,33 @@ static const unsigned char PROGMEM logo_bmp[] =
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
-//Menu Strings
-// [0] = "Menu Prog. Sair"
-// [1] = "1 - V de REcarga"
-// [2] = "2 - V final de carga"
-// [3] = "3 - T maximo de carga"
-// [4] = "4 - Corrigir ADC"
-// [5] = "5 - Setar R1"
-// [6] = "6 - Setar R2"
-// [7] = "7 - Pre-Cfg" 
-// [8] = "1 - 24V"
-// [9] = "2 - 36V"
-// [10] = "3 - 48V",
-// [11] = "Valor atual: "
-// [12] = "Valor atual em Horas:"
-// [13] = "Valor em % multiplicado por 1000:"
+/*
+Menu Strings
+[0] = "Menu Prog. Sair"
+[1] = "1 - V de REcarga"
+[2] = "2 - V final de carga"
+[3] = "3 - T maximo de carga"
+[4] = "4 - Corrigir ADC"
+[5] = "5 - Setar R1"
+[6] = "6 - Setar R2"
+[7] = "7 - Pre-Cfg" 
+[8] = "1 - 24V"
+[9] = "2 - 36V"
+[10] = "3 - 48V",
+[11] = "Valor atual: "
+[12] = "Valor atual em Horas:"
+[13] = "Valor em % multiplicado por 1000:"
+[14] = "Modo Operacao"
+[15] = "Modo - Auto"
+[16] = "Modo - Bloq"
+[17] = "Reservado"
+*/
 const char *menuOptions[] = {
   "Menu Prog. Sair", "1 - V de REcarga","2 - V final de carga",
   "3 - T maximo de carga", "4 - Corrigir ADC", "5 - Setar R1",
   "6 - Setar R2","7 - Pre-Cfg", "1 - 24V", "2 - 36V", "3 - 48V",
-  "Valor atual: ", "Valor atual em Horas:" , "Valor em % multiplicado por 1000:"
+  "Valor atual: ", "Valor atual em Horas:" , "Valor em % multiplicado por 1000:",
+  "Modo Operacao", "Modo - Auto", "Modo - Bloq", "Reservado"
 };
 //ADC CFG
 #define ADC_CH  A0
@@ -105,6 +112,22 @@ int adcFixADDR = 60;
 //void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
 void menuConfig();
 void displayCall();
+
+class SystemMode{
+  private:
+  uint8_t systemCurrentMode;
+  
+  public:
+  SystemMode():systemCurrentMode(0){};
+
+  void setMode(uint8_t newMode) {
+    systemCurrentMode = newMode;
+  }
+
+  uint8_t getCurrentMode(){
+    return systemCurrentMode;
+  }
+};
 
 class MenuCursor{
   private:
@@ -458,11 +481,30 @@ class AdConverter {
       return adcChannel;
     }
 };
+
+class BloqCycle: public ChargeCycle{
+  private:
+  uint32_t bloqDelay;
+
+  public:
+  BloqCycle():bloqDelay(10){};
+
+  void setBloqDelay(uint32_t newDelay){
+    bloqDelay = newDelay;
+  }
+
+  uint32_t getBloqDelay() {
+    return bloqDelay;
+  }
+};
+
 //---------------------------------
 AdConverter adc;
 Battery battery;
 ChargeCycle cycle;
 MenuCursor menuCursor;
+SystemMode systemMode;
+BloqCycle bloqCycle;
 
 void setup() {  
   //3.5V external reference
@@ -506,7 +548,7 @@ void loop() {
 
   //"Global" utils
   unsigned long previousMillis = 0;
-  byte chargeStatus = 0; //Start System on Status - 0
+  
   String lastTime;
   //System Lock
   while (true) { //Power On Routine -- TODO: change to State Machina -> switch case?
@@ -518,110 +560,215 @@ void loop() {
     }
     if (cursorDelayTime > cursorDelayTimeMenuEntry) {      
       cursorDelayTime = 0; //set cursor verifier to 0
-      chargeStatus = 0; //change if needed
+      //chargeStatus = 0; //change if needed
       menuConfig(); //Enter Menu
     }
 
-    //Charger - Startup
-    while (chargeStatus == 0) {     // Self-Test Routine -- TODO: change to State Machine -> switch case?
-      chargeStatus = 1;
+    //System - Startup
+    while (systemMode.getCurrentMode() == 2) {     // Self-Test Routine -- TODO: change to State Machine -> switch case?
+      //chargeStatus = 1;
       //load variables or selftest
     }
-    //Charger - Charge
-    while (chargeStatus == 1) {      // On Charge Routine -- TODO: change to State Machine -> switch case?      
-      digitalWrite(outputRelay, LOW);
-      digitalWrite(outputExtra, HIGH);
-      //Button state checker - menu entry
-      if (menuCursor.readPress(10) == 1) {
-        cursorDelayTime++;
-      } else {
-        cursorDelayTime = 0;
+    //System Mode - Auto
+    while (systemMode.getCurrentMode() == 0) {      // On Charge Routine -- TODO: change to State Machine -> switch case?      
+      byte systemStatus = 0; //Start System on Status - 0
+      //Charger - Charge
+      while(systemStatus == 1) {
+        digitalWrite(outputRelay, LOW);
+        digitalWrite(outputExtra, HIGH);
+        //Button state checker - menu entry
+        if (menuCursor.readPress(10) == 1) {
+          cursorDelayTime++;
+        } else {
+          cursorDelayTime = 0;
+        }
+        if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+          cursorDelayTime = 0;
+          systemStatus = 0;
+          menuConfig();
+        }
+        //Led system on blink
+        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        //Voltage reading and battery setting
+        battery.setVoltage(adc.getReading(8000));
+        //Display routine
+        display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+        display.setTextColor(SSD1306_WHITE);
+        display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
+        display.setTextSize(1);
+        display.setCursor(52, 16);
+        display.println(F("Tempo atual"));
+        display.setCursor(52, 24);
+        display.println(cycle.getCurrentTimeFormated());
+        display.setTextSize(2);
+        display.setCursor(52, 1);
+        display.println(battery.getVoltage(), 2);
+        display.display();
+        /*
+        //Send Json
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+          delay(50);
+        }
+        */
+        //Charge complete checker
+        if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
+          lastTime = cycle.getCurrentTimeFormated();
+          systemStatus = 2;
+          display.clearDisplay();
+          previousMillis = millis();
+        }
       }
-      if (cursorDelayTime > cursorDelayTimeMenuEntry) {
-        cursorDelayTime = 0;
-        chargeStatus = 0;
-        menuConfig();
-      }
-      //Led system on blink
-      !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
-      //Voltage reading and battery setting
-      battery.setVoltage(adc.getReading(8000));
-      //Display routine
-      display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
-      display.setTextColor(SSD1306_WHITE);
-      display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
-      display.setTextSize(1);
-      display.setCursor(52, 16);
-      display.println(F("Tempo atual"));
-      display.setCursor(52, 24);
-      display.println(cycle.getCurrentTimeFormated());
-      display.setTextSize(2);
-      display.setCursor(52, 1);
-      display.println(battery.getVoltage(), 2);
-      display.display();
-      /*
-      //Send Json
-      unsigned long currentMillis = millis();
-      if (currentMillis - previousMillis >= 200) {
-        previousMillis = currentMillis;
-        sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
-        delay(50);
-      }
-      */
-      //Charge complete checker
-      if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
-        lastTime = cycle.getCurrentTimeFormated();
-        chargeStatus = 2;
+    
+      //Charger - Complete
+      while (systemStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
+        digitalWrite(outputRelay, HIGH);
+        digitalWrite(outputExtra, LOW);
+        //Button state checker - menu entry
+        if (menuCursor.readPress(10) == 1) {
+          cursorDelayTime++;
+        } else {
+          cursorDelayTime = 0;
+        }
+        if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+          cursorDelayTime = 0;
+          systemStatus = 0;
+          menuConfig();
+        }
+        
+        battery.setVoltage(adc.getReading(4000));
+        //Display Routine
         display.clearDisplay();
-        previousMillis = millis();
+        display.setTextSize(1);
+        display.setCursor(1, 1);
+        display.print(F("Completa: ciclo "));
+        display.print(cycle.getCurrentCycle());
+        display.setTextSize(2);
+        display.setCursor(1, 15);
+        display.println(lastTime);
+        display.display();
+
+        /*
+        //Send Json
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
+          delay(50);
+        }
+        */
+        //Start Voltage checker
+        if (battery.getVoltage() < battery.getStartVoltage()) { //TODO Correct restart condition
+          cycle.addCurrentCycle();
+          systemStatus = 1;
+          display.clearDisplay();
+          cycle.setOffsetMillis(millis());
+        }
       }
     }
-    //Charger - Complete
-    while (chargeStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
-      digitalWrite(outputRelay, HIGH);
-      digitalWrite(outputExtra, LOW);
-      //Button state checker - menu entry
-      if (menuCursor.readPress(10) == 1) {
-        cursorDelayTime++;
-      } else {
-        cursorDelayTime = 0;
-      }
-      if (cursorDelayTime > cursorDelayTimeMenuEntry) {
-        cursorDelayTime = 0;
-        chargeStatus = 0;
-        menuConfig();
-      }
-      
-      battery.setVoltage(adc.getReading(4000));
-      //Display Routine
-      display.clearDisplay();
-      display.setTextSize(1);
-      display.setCursor(1, 1);
-      display.print(F("Completa: ciclo "));
-      display.print(cycle.getCurrentCycle());
-      display.setTextSize(2);
-      display.setCursor(1, 15);
-      display.println(lastTime);
-      display.display();
 
-      /*
-      //Send Json
-      unsigned long currentMillis = millis();
-      if (currentMillis - previousMillis >= 200) {
-        previousMillis = currentMillis;
-        sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
-        delay(50);
+    //System Mode - Bloq
+    while (systemMode.getCurrentMode() == 1) {      // Use Bloq Routine -- TODO: change to State Machine -> switch case?      
+      byte systemStatus = 0; //Start System on Status - 0
+      //Bloq - Unlocked
+      while(systemStatus == 1) {
+        digitalWrite(outputRelay, LOW);
+        digitalWrite(outputExtra, HIGH);
+        //Button state checker - menu entry
+        if (menuCursor.readPress(10) == 1) {
+          cursorDelayTime++;
+        } else {
+          cursorDelayTime = 0;
+        }
+        if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+          cursorDelayTime = 0;
+          systemStatus = 0;
+          menuConfig();
+        }
+        //Led system on blink
+        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        //Voltage reading and battery setting
+        battery.setVoltage(adc.getReading(8000));
+        //Display routine
+        display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+        display.setTextColor(SSD1306_WHITE);
+        display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
+        display.setTextSize(1);
+        display.setCursor(52, 16);
+        display.println(F("Bloqueador"));
+        display.setCursor(52, 24);
+        display.println(bloqCycle.getCurrentTimeFormated());
+        display.setTextSize(2);
+        display.setCursor(52, 1);
+        display.println(battery.getVoltage(), 2);
+        display.display();
+        /*
+        //Send Json
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+          delay(50);
+        }
+        */
+        //Charge complete checker
+        //TODO: Bloq countdown timer
+        if (battery.getEndVoltage() < battery.getVoltage() || bloqCycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
+          lastTime = bloqCycle.getCurrentTimeFormated();
+          systemStatus = 2;
+          display.clearDisplay();
+          previousMillis = millis();
+        }
       }
-      */
-      //Start Voltage checker
-      if (battery.getVoltage() < battery.getStartVoltage()) { //TODO Correct restart condition
-        cycle.addCurrentCycle();
-        chargeStatus = 1;
+    
+      //Bloq - Locked
+      while (systemStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
+        digitalWrite(outputRelay, HIGH);
+        digitalWrite(outputExtra, LOW);
+        //Button state checker - menu entry
+        if (menuCursor.readPress(10) == 1) {
+          cursorDelayTime++;
+        } else {
+          cursorDelayTime = 0;
+        }
+        if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+          cursorDelayTime = 0;
+          systemStatus = 0;
+          menuConfig();
+        }
+        
+        battery.setVoltage(adc.getReading(4000));
+        //Display Routine
         display.clearDisplay();
-        cycle.setOffsetMillis(millis());
+        display.setTextSize(1);
+        display.setCursor(1, 1);
+        display.print(F("Bloq: ciclo "));
+        display.print(bloqCycle.getCurrentCycle());
+        display.setTextSize(2);
+        display.setCursor(1, 15);
+        display.println(lastTime);
+        display.display();
+
+        /*
+        //Send Json
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
+          delay(50);
+        }
+        */
+        //Start Voltage checker
+        if (battery.getVoltage() < battery.getStartVoltage()) { //TODO Correct restart condition
+          bloqCycle.addCurrentCycle();
+          systemStatus = 1;
+          display.clearDisplay();
+          bloqCycle.setOffsetMillis(millis());
+        }
       }
     }
-
   }
    
 }
@@ -882,7 +1029,9 @@ void menuConfig(){
       displayCall(true, 1, 1);
       display.print(menuOptions[6]);
       displayCall(false, 1, 12);
-      display.print(menuOptions[7]);    
+      display.print(menuOptions[7]);       
+      displayCall(false, 1, 22);
+      display.print(menuOptions[14]);   
       displayCall(false, 120, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
@@ -922,7 +1071,7 @@ void menuConfig(){
           }
           break;
 
-        case 7: //Set pre defined values for 12v -24v - 36v - 48v
+        case 7: //Set pre defined values for 24v - 36v - 48v
           //Hover animation               
           displayCall(false, 1, 12, true);
           display.print(menuOptions[7]);
@@ -999,8 +1148,76 @@ void menuConfig(){
             }
           }
           break;
+        
+        case 8://Set Operation Mode
+          //Hover animation               
+          displayCall(false, 1, 12, true);
+          display.print(menuOptions[14]);
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            menuCursor.updateCursor(menuCursor.readPress(20), true);            
+            displayCall(true, 1, 1);
+            display.print(menuOptions[15]);
+            displayCall(false, 1, 12);
+            display.print(menuOptions[16]);
+            displayCall(false, 1, 22);
+            display.print(menuOptions[17]);
+            //Button state checker
+            switch (menuCursor.getCursorPositionInsideMenu()) {
+              case 0: //Set Operation Mode - Auto
+                //Hover animation
+                displayCall(false, 1, 1, true);
+                display.print(menuOptions[15]);
+                display.display();
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set Auto
+                  systemMode.setMode(0);
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
 
-        case 8:
+              case 1: //Set Operation Mode - Bloq
+                //Hover animation
+                displayCall(false, 1, 12, true);
+                display.print(menuOptions[16]);
+                display.display();
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set Bloq
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
+
+              case 2: //Reserved
+                //Hover animation
+                displayCall(false, 1, 22, true);
+                display.print(menuOptions[17]);
+                display.display();
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set Reserved
+                  //systemMode.setMode() ?
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
+
+              case 3:
+              menuCursor.clear();
+              menuPage = 0;
+              break;
+
+              default:
+              break;
+            }
+          }
+        break;
+
+        case 9:
           menuCursor.clear();
           menuPage = 0;
           break;
