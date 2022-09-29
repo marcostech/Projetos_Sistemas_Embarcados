@@ -102,6 +102,7 @@ uint8_t cursorDelayTime = 0; //buffer variable to store input data
 uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
 //EEPROM CFG
 const long OVF = 1000000;
+int systemModeADDR = 0;
 int endVoltageADDR = 10;
 int startVoltageADDR = 20;
 int maxChargeTimeADDR = 30;
@@ -119,9 +120,18 @@ class SystemMode{
   
   public:
   SystemMode():systemCurrentMode(0){};
+    
+  void Begin() {
+    systemCurrentMode = EEPROM.get(systemModeADDR, systemCurrentMode);
+    delay(10);
+    if (isnan(systemCurrentMode) || systemCurrentMode <= 0 || systemCurrentMode > OVF) {
+      systemCurrentMode = 0;
+    }
+  }
 
   void setMode(uint8_t newMode) {
     systemCurrentMode = newMode;
+    EEPROM.put(systemModeADDR, systemCurrentMode);
   }
 
   uint8_t getCurrentMode(){
@@ -505,7 +515,7 @@ ChargeCycle cycle;
 MenuCursor menuCursor;
 SystemMode systemMode;
 BloqCycle bloqCycle;
-
+//TODO: Test eeprom first read, is it saved or hard coded?
 void setup() {  
   //3.5V external reference
   //analogReference(EXTERNAL);
@@ -541,7 +551,8 @@ void loop() {
   //Correct init of objects for use with arduino abstractions
   adc.Begin();
   battery.Begin();
-
+  systemMode.Begin();
+  
   digitalWrite(outputRelay, LOW);
   digitalWrite(outputExtra, HIGH);
   //Serial.begin(115200);
@@ -570,8 +581,9 @@ void loop() {
       //load variables or selftest
     }
     //System Mode - Auto
+    //TODO: Set startup Delay
     while (systemMode.getCurrentMode() == 0) {      // On Charge Routine -- TODO: change to State Machine -> switch case?      
-      byte systemStatus = 0; //Start System on Status - 0
+      byte systemStatus = 1; //Start System on Status - 0
       //Charger - Charge
       while(systemStatus == 1) {
         digitalWrite(outputRelay, LOW);
@@ -671,7 +683,7 @@ void loop() {
 
     //System Mode - Bloq
     while (systemMode.getCurrentMode() == 1) {      // Use Bloq Routine -- TODO: change to State Machine -> switch case?      
-      byte systemStatus = 0; //Start System on Status - 0
+      byte systemStatus = 1; //Start System on Status - 0
       //Bloq - Unlocked
       while(systemStatus == 1) {
         digitalWrite(outputRelay, LOW);
@@ -1151,7 +1163,7 @@ void menuConfig(){
         
         case 8://Set Operation Mode
           //Hover animation               
-          displayCall(false, 1, 12, true);
+          displayCall(false, 1, 22, true);
           display.print(menuOptions[14]);
           display.display();
           //Enter Menu
