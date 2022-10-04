@@ -635,12 +635,11 @@ void loop() {
 
     //System - Startup
     while (systemMode.getCurrentMode() == 3) { 
-      //TODO: Create time before start here!
+      //TODO: Create time before start here! Startup Delay
       //Led system on blink
       !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
     }
     //System Mode - Auto
-    //TODO: Set startup Delay
     while (systemMode.getCurrentMode() == 1) {      // On Charge Routine      
       byte systemStatus = 1; //Start System on Status - 0
       //Charger - Charge
@@ -1102,7 +1101,7 @@ void menuConfig(){
       }
     }
     //Page 3
-    while (menuPage == 2) {          
+    while (menuPage == 2) {
       //Menu display
       displayCall(true, 1, 1);
       display.print(menuOptions[6]);
