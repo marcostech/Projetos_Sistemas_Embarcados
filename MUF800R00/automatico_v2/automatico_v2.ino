@@ -89,6 +89,7 @@ const char *menuOptions[] = {
   "Valor atual: ", "Valor atual em Horas:" , "Valor em % multiplicado por 1000:",
   "8 - Modo Operacao", "Modo - Auto", "Modo - Bloq", "Reservado"
 };
+const char *timeOut = "Timeout";
 //ADC CFG
 #define ADC_CH  A0
 //Digital CFG
@@ -272,7 +273,10 @@ class ChargeCycle  {
   private:
     short currentTimeHours;
     byte currentCycle;
-    unsigned long  offsetMillis;
+    unsigned long offsetMillis;
+    uint64_t countdownOffsetMillis;
+    uint64_t countdownMaxTime;
+    bool countdownFlag;
 
   public:
     ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0){};    
@@ -337,6 +341,59 @@ class ChargeCycle  {
 
     int getCurrentTimeHours () {
       return currentTimeHours;
+    }
+
+    void countdownBegin(uint64_t newCountdownTime){
+      countdownOffsetMillis = millis();
+      countdownMaxTime = newCountdownTime / 1000;
+      countdownFlag = false;
+    }
+
+    void countdownReset(){
+      countdownOffsetMillis = millis();
+    }
+
+    String getCountdownTime(){      
+      int64_t currentTimeSeconds = (millis() - countdownOffsetMillis ) / 1000;
+      int64_t currentCountdownTime = countdownMaxTime - currentTimeSeconds;
+      uint16_t currentTimeMinutes = 0;
+      uint16_t currentTimeHoursFormated = 0;
+      uint16_t currentTimeSecondsFormated = 0;
+      uint16_t currentTimeMinutesFormated = 0;
+      bool hasTimeLeft = true;
+      //Early return - Timeout
+      if(currentCountdownTime <= 0){
+        countdownFlag = true;
+        return timeOut;
+      }
+      
+      //Seconds processing
+      while (hasTimeLeft) {
+        if ((currentCountdownTime / 60) >= 1) {
+          currentCountdownTime -= 60;
+          ++currentTimeMinutes;
+        } else {
+          hasTimeLeft = false;
+          currentTimeSecondsFormated = currentCountdownTime;
+        }
+      }
+      //Minutes processing
+      hasTimeLeft = true;
+      while (hasTimeLeft) {
+        if ((currentTimeMinutes / 60) >= 1) {
+          currentTimeMinutes -= 60;
+          ++currentTimeHoursFormated;
+        } else {
+          hasTimeLeft = false;
+          currentTimeMinutesFormated = currentTimeMinutes;
+        }
+      }
+      
+      
+      //String formater - get values and make a formated string to return      
+      char stringBuffer[20];
+      sprintf(stringBuffer, "%02d:%02d:%02d", currentTimeHoursFormated, currentTimeMinutesFormated, currentCountdownTime);
+      return stringBuffer;
     }
 };
 
@@ -577,13 +634,14 @@ void loop() {
     }
 
     //System - Startup
-    while (systemMode.getCurrentMode() == 3) {     // Self-Test Routine -- TODO: change to State Machine -> switch case?
-      //chargeStatus = 1;
-      //load variables or selftest
+    while (systemMode.getCurrentMode() == 3) { 
+      //TODO: Create time before start here!
+      //Led system on blink
+      !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
     }
     //System Mode - Auto
     //TODO: Set startup Delay
-    while (systemMode.getCurrentMode() == 1) {      // On Charge Routine -- TODO: change to State Machine -> switch case?      
+    while (systemMode.getCurrentMode() == 1) {      // On Charge Routine      
       byte systemStatus = 1; //Start System on Status - 0
       //Charger - Charge
       while(systemStatus == 1) {
@@ -636,7 +694,7 @@ void loop() {
       }
     
       //Charger - Complete
-      while (systemStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
+      while (systemStatus == 2) {      // Charge Complete Routine
         digitalWrite(outputRelay, HIGH);
         digitalWrite(outputExtra, LOW);
         //Button state checker - menu entry
@@ -673,7 +731,7 @@ void loop() {
         }
         */
         //Start Voltage checker
-        if (battery.getVoltage() < battery.getStartVoltage()) { //TODO Correct restart condition
+        if (battery.getVoltage() < battery.getStartVoltage()) { 
           cycle.addCurrentCycle();
           systemStatus = 1;
           display.clearDisplay();
@@ -683,8 +741,10 @@ void loop() {
     }
 
     //System Mode - Bloq
-    while (systemMode.getCurrentMode() == 2) {      // Use Bloq Routine -- TODO: change to State Machine -> switch case?      
+    while (systemMode.getCurrentMode() == 2) {      // Use Bloq Routine      
       byte systemStatus = 1; //Start System on Status - 0
+      //TODO: Create setter menu for the user
+      bloqCycle.countdownBegin(5000);
       //Bloq - Unlocked
       while(systemStatus == 1) {
         digitalWrite(outputRelay, LOW);
@@ -712,7 +772,7 @@ void loop() {
         display.setCursor(52, 16);
         display.println(F("Bloqueador"));
         display.setCursor(52, 24);
-        display.println(bloqCycle.getCurrentTimeFormated());
+        display.println(bloqCycle.getCountdownTime());
         display.setTextSize(2);
         display.setCursor(52, 1);
         display.println(battery.getVoltage(), 2);
@@ -727,8 +787,13 @@ void loop() {
         }
         */
         //Charge complete checker
-        //TODO: Bloq countdown timer
-        if (battery.getEndVoltage() > battery.getVoltage() || bloqCycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
+        if (battery.getEndVoltage() > battery.getVoltage()) {
+          //Let countdownTime go freely
+        } else {
+          //Reset if conditions are not met, countdownTime = countdownBegin
+          bloqCycle.countdownReset();
+        }
+        if(bloqCycle.getCountdownTime() == timeOut) {
           lastTime = bloqCycle.getCurrentTimeFormated();
           systemStatus = 2;
           display.clearDisplay();
@@ -737,7 +802,7 @@ void loop() {
       }
     
       //Bloq - Locked
-      while (systemStatus == 2) {      // Charge Complete Routine -- TODO: change to State Machine -> switch case ?
+      while (systemStatus == 2) {      // Charge Complete Routine 
         digitalWrite(outputRelay, HIGH);
         digitalWrite(outputExtra, LOW);
         //Button state checker - menu entry
@@ -774,7 +839,7 @@ void loop() {
         }
         */
         //Start Voltage checker
-        if (battery.getVoltage() > battery.getStartVoltage()) { //TODO Correct restart condition
+        if (battery.getVoltage() > battery.getStartVoltage()) { 
           bloqCycle.addCurrentCycle();
           systemStatus = 1;
           display.clearDisplay();
