@@ -80,14 +80,17 @@ Menu Strings
 [14] = "Modo Operacao"
 [15] = "Modo - Auto"
 [16] = "Modo - Bloq"
-[17] = "Reservado"
+[17] = "9 - Tempo Retardo"
+[18] = "Reservado"
+[19] = "Valor atual em s: "
 */
 const char *menuOptions[] = {
   "Menu Prog. Sair", "1 - V de REcarga","2 - V final de carga",
   "3 - T maximo de carga", "4 - Corrigir ADC", "5 - Setar R1",
   "6 - Setar R2","7 - Pre-Cfg", "1 - 24V", "2 - 36V", "3 - 48V",
   "Valor atual: ", "Valor atual em Horas:" , "Valor em % multiplicado por 1000:",
-  "8 - Modo Operacao", "Modo - Auto", "Modo - Bloq", "Reservado"
+  "8 - Modo Operacao", "Modo - Auto", "Modo - Bloq", "9 - Tempo Retardo",
+  "Reservado", "Valor em seg.: "
 };
 const char *timeOut = "Timeout";
 //ADC CFG
@@ -110,6 +113,7 @@ int maxChargeTimeADDR = 30;
 int R1ADDR = 40;
 int R2ADDR = 50;
 int adcFixADDR = 60;
+uint16_t bloqDelayADDR = 70;
 //------------------------
 //void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
 void menuConfig();
@@ -130,7 +134,10 @@ class SystemMode{
       setMode(1);
     }
   }
-
+/*0 = Test Mode
+1 = Charger Auto Mode
+2 = Bloq Mode
+*/
   void setMode(uint16_t newMode) {
     systemCurrentMode = newMode;
     EEPROM.put(systemModeADDR, systemCurrentMode);
@@ -552,16 +559,25 @@ class AdConverter {
 
 class BloqCycle: public ChargeCycle{
   private:
-  uint32_t bloqDelay;
+  uint64_t bloqDelay;
 
   public:
-  BloqCycle():bloqDelay(10){};
+  BloqCycle():bloqDelay(5000){};
 
-  void setBloqDelay(uint32_t newDelay){
-    bloqDelay = newDelay;
+  void Begin(){
+    bloqDelay = EEPROM.get(bloqDelayADDR, bloqDelay);
+    delay(10);
+    if (isnan(bloqDelay) || bloqDelay <= 0 || bloqDelay >= OVF) {      
+      setCountdownTimeCfg(5000);
+    }
   }
 
-  uint32_t getBloqDelay() {
+  void setCountdownTimeCfg(uint64_t newDelay){
+    bloqDelay = newDelay;
+    EEPROM.put(bloqDelayADDR, bloqDelay);
+  }
+
+  uint64_t getCountdownTimeCfg() {
     return bloqDelay;
   }
 };
@@ -610,7 +626,7 @@ void loop() {
   adc.Begin();
   battery.Begin();
   systemMode.Begin();
-
+  bloqCycle.Begin();
   digitalWrite(outputRelay, LOW);
   digitalWrite(outputExtra, HIGH);
   //Serial.begin(115200);
@@ -742,8 +758,7 @@ void loop() {
     //System Mode - Bloq
     while (systemMode.getCurrentMode() == 2) {      // Use Bloq Routine      
       byte systemStatus = 1; //Start System on Status - 0
-      //TODO: Create setter menu for the user
-      bloqCycle.countdownBegin(5000);
+      bloqCycle.countdownBegin(bloqCycle.getCountdownTimeCfg());
       //Bloq - Unlocked
       while(systemStatus == 1) {
         digitalWrite(outputRelay, LOW);
@@ -766,16 +781,10 @@ void loop() {
         //Display routine
         display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
         display.setTextColor(SSD1306_WHITE);
-        display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
-        display.setTextSize(1);
-        display.setCursor(52, 16);
-        display.println(F("Bloqueador"));
-        display.setCursor(52, 24);
-        display.println(bloqCycle.getCountdownTime());
+        display.fillRect(34, 0, 80, 32, SSD1306_BLACK);        
         display.setTextSize(2);
         display.setCursor(52, 1);
         display.println(battery.getVoltage(), 2);
-        display.display();
         /*
         //Send Json
         unsigned long currentMillis = millis();
@@ -785,11 +794,20 @@ void loop() {
           delay(50);
         }
         */
-        //Charge complete checker
+        //Battery Discharge checker
         if (battery.getEndVoltage() > battery.getVoltage()) {
-          //Let countdownTime go freely
+          //Let countdownTime go freely  
+          display.setTextSize(1); 
+          display.setCursor(52, 16);
+          display.println(F("Ativar em:"));
+          display.setCursor(52, 24);
+          display.println(bloqCycle.getCountdownTime());
+          display.display();
         } else {
-          //Reset if conditions are not met, countdownTime = countdownBegin
+          //Reset if conditions are not met, countdownTime = countdownBegin          
+          display.setCursor(52, 16);             
+          display.println(F("livre"));
+          display.display();
           bloqCycle.countdownReset();
         }
         if(bloqCycle.getCountdownTime() == timeOut) {
@@ -821,7 +839,7 @@ void loop() {
         display.clearDisplay();
         display.setTextSize(1);
         display.setCursor(1, 1);
-        display.print(F("Bloq: ciclo "));
+        display.print(F("T. em uso: ciclo "));
         display.print(bloqCycle.getCurrentCycle());
         display.setTextSize(2);
         display.setCursor(1, 15);
@@ -837,7 +855,7 @@ void loop() {
           delay(50);
         }
         */
-        //Start Voltage checker
+        //Battery charged checker
         if (battery.getVoltage() > battery.getStartVoltage()) { 
           bloqCycle.addCurrentCycle();
           systemStatus = 1;
@@ -905,7 +923,7 @@ void menuConfig(){
       display.print(menuOptions[1]);
       displayCall(false, 1, 22); 
       display.print(menuOptions[2]);     
-      displayCall(false, 120, 12);
+      displayCall(false, 115, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button state checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -995,7 +1013,7 @@ void menuConfig(){
       display.print(menuOptions[4]);
       displayCall(false, 1, 22); 
       display.print(menuOptions[5]);     
-      displayCall(false, 120, 12);
+      displayCall(false, 115, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -1109,7 +1127,7 @@ void menuConfig(){
       display.print(menuOptions[7]);       
       displayCall(false, 1, 22);
       display.print(menuOptions[14]);   
-      displayCall(false, 120, 12);
+      displayCall(false, 115, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
       menuCursor.updateCursor(menuCursor.readPress(20), false);
@@ -1239,7 +1257,7 @@ void menuConfig(){
             displayCall(false, 1, 12);
             display.print(menuOptions[16]);
             displayCall(false, 1, 22);
-            display.print(menuOptions[17]);
+            display.print(menuOptions[18]);
             //Button state checker
             switch (menuCursor.getCursorPositionInsideMenu()) {
               case 0: //Set Operation Mode - Auto
@@ -1296,6 +1314,86 @@ void menuConfig(){
         break;
 
         case 9:
+          menuPage = 3;
+          break;
+
+        default:
+          break;
+      }
+    }  
+    //Page 4
+    while (menuPage == 3) {
+      //Menu display
+      displayCall(true, 1, 1);
+      display.print(menuOptions[17]);
+      displayCall(false, 1, 12);
+      display.print(menuOptions[18]);
+      displayCall(false, 1, 22); 
+      display.print(menuOptions[18]);     
+      displayCall(false, 115, 12);
+      display.print(menuCursor.getMenuCursorPosition());
+      //Button Checker
+      menuCursor.updateCursor(menuCursor.readPress(20), false);
+      //Menu Selection
+      switch (menuCursor.getMenuCursorPosition()) {
+        case 8:
+          menuPage = 2;
+          break;
+
+        case 9: //Set countdown Time
+          //Hover animation               
+          displayCall(false, 1, 1, true);
+          display.print(menuOptions[17]);
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            displayCall(true, 1, 1, false);
+            display.print(menuOptions[19]);
+            display.print((bloqCycle.getCountdownTimeCfg() / (double)1000));
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              bloqCycle.setCountdownTimeCfg(bloqCycle.getCountdownTimeCfg() + 1000);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              bloqCycle.setCountdownTimeCfg(bloqCycle.getCountdownTimeCfg() - 1000);                  
+            }
+          }
+          break;
+
+        case 10: //Reserved
+          //Hover animation     
+          displayCall(false, 1, 12, true);
+          display.print(menuOptions[18]);
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            //Reserved
+            menuCursor.clear();
+            menuPage = 0;
+          }
+          break;
+
+        case 11: //Reserved
+          //Hover animation               
+          displayCall(false, 1, 22, true);
+          display.print(menuOptions[18]);
+          display.display(); 
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            //Reserved
+            menuCursor.clear();
+            menuPage = 0;
+          }
+          break;
+
+        case 12:
           menuCursor.clear();
           menuPage = 0;
           break;
@@ -1303,7 +1401,7 @@ void menuConfig(){
         default:
           break;
       }
-    }      
+    }    
   }
 }
 //
