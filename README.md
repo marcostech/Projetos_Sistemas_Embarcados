@@ -4,6 +4,7 @@ Projetos desenvolvidos também com layout PCB e esquema elétrico.
 
 Trabalhando atualmente em :
 - Sistema - MUF800R00 - Refatorando
+- Versão atual - V2 (automatico e bloqueador)
 
 Sistemas desenvolvidos para uso industrial.
 - MUF800R00: -> Sistema alvo Arduino -> WIP saida JSON
