@@ -113,7 +113,8 @@ int maxChargeTimeADDR = 30;
 int R1ADDR = 40;
 int R2ADDR = 50;
 int adcFixADDR = 60;
-uint16_t bloqDelayADDR = 70;
+uint16_t countdownValueADDR = 70;
+uint8_t countdownFlagADDR = 80;
 //------------------------
 //void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
 void menuConfig();
@@ -122,7 +123,8 @@ void displayCall();
 class SystemMode{
   private:
   uint16_t systemCurrentMode;
-  
+  bool countdownFlag;
+
   public:
   SystemMode():systemCurrentMode(1){};
     
@@ -133,8 +135,15 @@ class SystemMode{
       //TODO: not working on first programmimg
       setMode(1);
     }
+
+    countdownFlag = EEPROM.get(countdownFlagADDR, countdownFlag);
+    delay(10);
+    if (countdownFlag < 0 || countdownFlag > 1) {      
+      countdownFlag = true;
+    }
   }
-/*0 = Test Mode
+
+/*0 = Countdown Mode
 1 = Charger Auto Mode
 2 = Bloq Mode
 */
@@ -145,6 +154,19 @@ class SystemMode{
 
   uint16_t getCurrentMode(){
     return systemCurrentMode;
+  }
+
+  void setCountdownFlag(bool newCountdownFlag){
+    if(newCountdownFlag) {
+      countdownFlag = 1;
+    } else {
+      countdownFlag = 0;
+    }
+    EEPROM.put(countdownFlagADDR, countdownFlag);
+  }
+
+  bool getCountdownFlag(){    
+    return (bool)countdownFlag;
   }
 };
 
@@ -284,9 +306,10 @@ class ChargeCycle  {
     uint64_t countdownOffsetMillis;
     uint64_t countdownMaxTime;
     bool countdownFlag;
+    uint64_t countdownValue;
 
   public:
-    ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0){};    
+    ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0),countdownValue(0){};    
 
     String getCurrentTimeFormated () {
       unsigned long currentTimeSeconds = (millis() - offsetMillis ) / 1000; //Test different time scenarios here
@@ -401,6 +424,23 @@ class ChargeCycle  {
       char stringBuffer[20];
       sprintf(stringBuffer, "%02d:%02d:%02d", currentTimeHoursFormated, currentTimeMinutesFormated, currentCountdownTime);
       return stringBuffer;
+    }
+
+    void BeginCountdownCfg(){
+      countdownValue = EEPROM.get(countdownValueADDR, countdownValue);
+      delay(10);
+      if (isnan(countdownValue) || countdownValue <= 0 || countdownValue >= OVF) {      
+        setCountdownTimeCfg(5000);
+      }
+    }
+
+    void setCountdownTimeCfg(uint64_t newDelay){
+      countdownValue = newDelay;
+      EEPROM.put(countdownValueADDR, countdownValue);
+    }
+
+    uint64_t getCountdownTimeCfg() {
+      return countdownValue;
     }
 };
 
@@ -557,39 +597,13 @@ class AdConverter {
     }
 };
 
-class BloqCycle: public ChargeCycle{
-  private:
-  uint64_t bloqDelay;
-
-  public:
-  BloqCycle():bloqDelay(5000){};
-
-  void Begin(){
-    bloqDelay = EEPROM.get(bloqDelayADDR, bloqDelay);
-    delay(10);
-    if (isnan(bloqDelay) || bloqDelay <= 0 || bloqDelay >= OVF) {      
-      setCountdownTimeCfg(5000);
-    }
-  }
-
-  void setCountdownTimeCfg(uint64_t newDelay){
-    bloqDelay = newDelay;
-    EEPROM.put(bloqDelayADDR, bloqDelay);
-  }
-
-  uint64_t getCountdownTimeCfg() {
-    return bloqDelay;
-  }
-};
-
 //---------------------------------
 AdConverter adc;
 Battery battery;
 ChargeCycle cycle;
 MenuCursor menuCursor;
 SystemMode systemMode;
-BloqCycle bloqCycle;
-//TODO: Test eeprom first read, is it saved or hard coded?
+//TODO: Eeprom first read is hard coded, Change ?
 void setup() {  
   //3.5V external reference
   //analogReference(EXTERNAL);
@@ -626,14 +640,15 @@ void loop() {
   adc.Begin();
   battery.Begin();
   systemMode.Begin();
-  bloqCycle.Begin();
+  cycle.BeginCountdownCfg();
+
   digitalWrite(outputRelay, LOW);
-  digitalWrite(outputExtra, HIGH);
+  digitalWrite(outputExtra, LOW);
   //Serial.begin(115200);
 
   //"Global" utils
   unsigned long previousMillis = 0;
-  
+  bool countdownFlagValue = systemMode.getCountdownFlag();
   String lastTime;
   //System Lock
   while (true) { //Power On Routine -- TODO: change to State Machina -> switch case?
@@ -650,11 +665,71 @@ void loop() {
     }
 
     //System - Startup
-    while (systemMode.getCurrentMode() == 3) { 
-      //TODO: Create time before start here! Startup Delay
-      //Led system on blink
-      !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+    while (countdownFlagValue) {             
+      byte systemStatus = 1; //Start System on Status - 0
+      cycle.countdownBegin(cycle.getCountdownTimeCfg());
+      //System - locked
+      while(systemStatus == 1) {
+        //Button state checker - menu entry
+        if (menuCursor.readPress(10) == 1) {
+          cursorDelayTime++;
+        } else {
+          cursorDelayTime = 0;
+        }
+        if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+          cursorDelayTime = 0;
+          systemStatus = 1;
+          menuConfig();
+        }
+        //Led system on blink
+        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        //Voltage reading and battery setting
+        battery.setVoltage(adc.getReading(8000));
+        //Display routine
+        display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+        display.setTextColor(SSD1306_WHITE);
+        display.fillRect(34, 0, 80, 32, SSD1306_BLACK);        
+        display.setTextSize(2);
+        display.setCursor(52, 1);
+        display.println(battery.getVoltage(), 2);
+        /*
+        //Send Json
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+          delay(50);
+        }
+        */
+        //Battery Discharge checker
+        if (battery.getVoltage() > (battery.getStartVoltage() * 0.5)) {
+          //Let countdownTime go freely  
+          display.setTextSize(1); 
+          display.setCursor(52, 16);
+          display.println(F("Inicio em:"));
+          display.setCursor(52, 24);
+          display.println(cycle.getCountdownTime());
+          display.display();
+        } else {
+          //Reset if conditions are not met, countdownTime = countdownBegin          
+          display.setTextSize(1);
+          display.setCursor(52, 16);             
+          display.println(F("erro bateria"));
+          display.setCursor(52, 24);             
+          display.println(F("Verifique!"));
+          display.display();
+          cycle.countdownReset();
+        }
+        if(cycle.getCountdownTime() == timeOut) {
+          systemStatus = 2;
+          display.clearDisplay();
+        }
+      }
+    //System Start
+      countdownFlagValue = false;
+      cycle.setOffsetMillis(millis());
     }
+
     //System Mode - Auto
     while (systemMode.getCurrentMode() == 1) {      // On Charge Routine      
       byte systemStatus = 1; //Start System on Status - 0
@@ -758,7 +833,7 @@ void loop() {
     //System Mode - Bloq
     while (systemMode.getCurrentMode() == 2) {      // Use Bloq Routine      
       byte systemStatus = 1; //Start System on Status - 0
-      bloqCycle.countdownBegin(bloqCycle.getCountdownTimeCfg());
+      cycle.countdownBegin(cycle.getCountdownTimeCfg());
       //Bloq - Unlocked
       while(systemStatus == 1) {
         digitalWrite(outputRelay, LOW);
@@ -801,17 +876,17 @@ void loop() {
           display.setCursor(52, 16);
           display.println(F("Ativar em:"));
           display.setCursor(52, 24);
-          display.println(bloqCycle.getCountdownTime());
+          display.println(cycle.getCountdownTime());
           display.display();
         } else {
           //Reset if conditions are not met, countdownTime = countdownBegin          
           display.setCursor(52, 16);             
           display.println(F("livre"));
           display.display();
-          bloqCycle.countdownReset();
+          cycle.countdownReset();
         }
-        if(bloqCycle.getCountdownTime() == timeOut) {
-          lastTime = bloqCycle.getCurrentTimeFormated();
+        if(cycle.getCountdownTime() == timeOut) {
+          lastTime = cycle.getCurrentTimeFormated();
           systemStatus = 2;
           display.clearDisplay();
           previousMillis = millis();
@@ -840,7 +915,7 @@ void loop() {
         display.setTextSize(1);
         display.setCursor(1, 1);
         display.print(F("T. em uso: ciclo "));
-        display.print(bloqCycle.getCurrentCycle());
+        display.print(cycle.getCurrentCycle());
         display.setTextSize(2);
         display.setCursor(1, 15);
         display.println(lastTime);
@@ -857,10 +932,10 @@ void loop() {
         */
         //Battery charged checker
         if (battery.getVoltage() > battery.getStartVoltage()) { 
-          bloqCycle.addCurrentCycle();
+          cycle.addCurrentCycle();
           systemStatus = 1;
           display.clearDisplay();
-          bloqCycle.setOffsetMillis(millis());
+          cycle.setOffsetMillis(millis());
         }
       }
     }
@@ -1269,6 +1344,7 @@ void menuConfig(){
                 while (menuCursor.getSubMenuFlag()) {
                   //Set Auto
                   systemMode.setMode(1);
+                  systemMode.setCountdownFlag(true);
                   menuCursor.clear();
                   menuPage = 0;
                 }
@@ -1282,7 +1358,8 @@ void menuConfig(){
                 //Enter Menu
                 while (menuCursor.getSubMenuFlag()) {
                   //Set Bloq
-                  systemMode.setMode(2);
+                  systemMode.setMode(2);                  
+                  systemMode.setCountdownFlag(false);
                   menuCursor.clear();
                   menuPage = 0;
                 }
@@ -1349,7 +1426,7 @@ void menuConfig(){
           while (menuCursor.getMenuFlag()) {
             displayCall(true, 1, 1, false);
             display.print(menuOptions[19]);
-            display.print((bloqCycle.getCountdownTimeCfg() / (double)1000));
+            display.print((cycle.getCountdownTimeCfg() / (double)1000));
             display.display();
             //Button state checker
             if (menuCursor.readPress(30) == 1) {
@@ -1358,11 +1435,11 @@ void menuConfig(){
             }                 
             //Up - set
             if (menuCursor.readPress(10) == 2) {
-              bloqCycle.setCountdownTimeCfg(bloqCycle.getCountdownTimeCfg() + 1000);                  
+              cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() + 1000);                  
             }                
             //Down - set
             if (menuCursor.readPress(10) == 3) {
-              bloqCycle.setCountdownTimeCfg(bloqCycle.getCountdownTimeCfg() - 1000);                  
+              cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() - 1000);                  
             }
           }
           break;
