@@ -813,7 +813,7 @@ void loop() {
         if(eqFlag){
           display.setTextSize(1); 
           display.setCursor(52, 16);
-          display.println(F("Equalizando:"));
+          display.println(F("Equalizar:"));
           display.setCursor(52, 24);
           display.println(cycle.getCountdownTime());
           display.display();
@@ -823,7 +823,7 @@ void loop() {
           //Reset if conditions are not met, countdownTime = countdownBegin  
           display.setTextSize(1);
           display.setCursor(52, 16);
-          display.println(F("Tempo atual"));
+          display.println(F("Em carga:"));
           display.setCursor(52, 24);
           display.println(cycle.getCurrentTimeFormated());
           display.display();
