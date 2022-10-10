@@ -1,0 +1,7 @@
+{
+    "sketch": "MUF800R00\\automatico_v2\\automatico_v2.ino",
+    "configuration": "cpu=atmega328",
+    "board": "arduino:avr:nano",
+    "port": "COM4",
+    "programmer": "arduino:arduinoasisp"
+}

@@ -83,6 +83,8 @@ Menu Strings
 [17] = "9 - Tempo Retardo"
 [18] = "Reservado"
 [19] = "Valor atual em s: "
+[20] = "10 - Tempo EQ"
+[21] = "Valor em min.: "
 */
 const char *menuOptions[] = {
   "Menu Prog. Sair", "1 - V de REcarga","2 - V final de carga",
@@ -90,7 +92,7 @@ const char *menuOptions[] = {
   "6 - Setar R2","7 - Pre-Cfg", "1 - 24V", "2 - 36V", "3 - 48V",
   "Valor atual: ", "Valor atual em Horas:" , "Valor em % multiplicado por 1000:",
   "8 - Modo Operacao", "Modo - Auto", "Modo - Bloq", "9 - Tempo Retardo",
-  "Reservado", "Valor em seg.: "
+  "Reservado", "Valor em seg.: ", "10 - Tempo EQ", "Valor em min.: "
 };
 const char *timeOut = "Timeout";
 //ADC CFG
@@ -115,6 +117,8 @@ int R2ADDR = 50;
 int adcFixADDR = 60;
 uint16_t countdownValueADDR = 70;
 uint8_t countdownFlagADDR = 80;
+uint8_t eqCountdownValueADDR = 90;
+
 //------------------------
 //void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
 void menuConfig();
@@ -141,6 +145,8 @@ class SystemMode{
     if (countdownFlag < 0 || countdownFlag > 1) {      
       countdownFlag = true;
     }
+
+
   }
 
 /*0 = Countdown Mode
@@ -307,9 +313,10 @@ class ChargeCycle  {
     uint64_t countdownMaxTime;
     bool countdownFlag;
     uint64_t countdownValue;
+    uint64_t eqCountdownValue;
 
   public:
-    ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0),countdownValue(0){};    
+    ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0),countdownValue(0),eqCountdownValue(0){};    
 
     String getCurrentTimeFormated () {
       unsigned long currentTimeSeconds = (millis() - offsetMillis ) / 1000; //Test different time scenarios here
@@ -432,6 +439,13 @@ class ChargeCycle  {
       if (isnan(countdownValue) || countdownValue <= 0 || countdownValue >= OVF) {      
         setCountdownTimeCfg(5000);
       }
+
+      eqCountdownValue = EEPROM.get(eqCountdownValueADDR, eqCountdownValue);
+      delay(10);
+      if (isnan(eqCountdownValue) || eqCountdownValue <= 0 || eqCountdownValue > 500000000) {      
+        setEqCountdownTimeCfg(60000);
+      }
+
     }
 
     void setCountdownTimeCfg(uint64_t newDelay){
@@ -441,6 +455,15 @@ class ChargeCycle  {
 
     uint64_t getCountdownTimeCfg() {
       return countdownValue;
+    }
+
+    void setEqCountdownTimeCfg(uint64_t newDelay){
+      eqCountdownValue = newDelay;
+      EEPROM.put(eqCountdownValueADDR, eqCountdownValue);
+    }
+
+    uint64_t getEqCountdownTimeCfg() {
+      return eqCountdownValue;
     }
 };
 
@@ -617,7 +640,7 @@ void setup() {
   pinMode(outputExtra, OUTPUT);
   //
   digitalWrite(outputRelay, LOW);
-  digitalWrite(outputExtra, HIGH);
+  digitalWrite(outputExtra, LOW);
   //Display verifier
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     while (true) { //Lock program if display fail
@@ -734,9 +757,11 @@ void loop() {
     while (systemMode.getCurrentMode() == 1) {      // On Charge Routine      
       byte systemStatus = 1; //Start System on Status - 0
       //Charger - Charge
+      cycle.countdownBegin(cycle.getEqCountdownTimeCfg());
+      bool eqFlag = false;
+      digitalWrite(outputRelay, LOW);
+      digitalWrite(outputExtra, HIGH);
       while(systemStatus == 1) {
-        digitalWrite(outputRelay, LOW);
-        digitalWrite(outputExtra, HIGH);
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
           cursorDelayTime++;
@@ -756,15 +781,9 @@ void loop() {
         display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
         display.setTextColor(SSD1306_WHITE);
         display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
-        display.setTextSize(1);
-        display.setCursor(52, 16);
-        display.println(F("Tempo atual"));
-        display.setCursor(52, 24);
-        display.println(cycle.getCurrentTimeFormated());
         display.setTextSize(2);
         display.setCursor(52, 1);
         display.println(battery.getVoltage(), 2);
-        display.display();
         /*
         //Send Json
         unsigned long currentMillis = millis();
@@ -774,13 +793,52 @@ void loop() {
           delay(50);
         }
         */
+        
         //Charge complete checker
-        if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
+        // if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
+        //   lastTime = cycle.getCurrentTimeFormated();
+        //   systemStatus = 2;
+        //   display.clearDisplay();
+        //   previousMillis = millis();
+        // } 
+
+        //Charge complete checker
+        if(battery.getEndVoltage() < battery.getVoltage()) {                    
+          eqFlag = true;
+        }
+        //Disable Equalization only if voltage goes below set point
+        if(battery.getStartVoltage() > battery.getVoltage()) {
+          eqFlag = false;
+        }        
+        if(eqFlag){
+          display.setTextSize(1); 
+          display.setCursor(52, 16);
+          display.println(F("Equalizando:"));
+          display.setCursor(52, 24);
+          display.println(cycle.getCountdownTime());
+          display.display();
+          //Led status blinker
+          digitalRead(outputExtra) ? digitalWrite(outputExtra, LOW) : digitalWrite(outputExtra, HIGH);
+        } else {
+          //Reset if conditions are not met, countdownTime = countdownBegin  
+          display.setTextSize(1);
+          display.setCursor(52, 16);
+          display.println(F("Tempo atual"));
+          display.setCursor(52, 24);
+          display.println(cycle.getCurrentTimeFormated());
+          display.display();
+          cycle.countdownReset();
+          //Set Output default state
+          digitalWrite(outputExtra, HIGH);
+        }
+        //Charge max hours and equalization countdown checker
+        if(cycle.getCountdownTime() == timeOut || cycle.getCurrentTimeHours() == battery.getMaxChargeTime()) {
           lastTime = cycle.getCurrentTimeFormated();
           systemStatus = 2;
           display.clearDisplay();
           previousMillis = millis();
         }
+
       }
     
       //Charger - Complete
@@ -1404,7 +1462,7 @@ void menuConfig(){
       displayCall(true, 1, 1);
       display.print(menuOptions[17]);
       displayCall(false, 1, 12);
-      display.print(menuOptions[18]);
+      display.print(menuOptions[20]);
       displayCall(false, 1, 22); 
       display.print(menuOptions[18]);     
       displayCall(false, 115, 12);
@@ -1444,16 +1502,30 @@ void menuConfig(){
           }
           break;
 
-        case 10: //Reserved
-          //Hover animation     
+        case 10: //Timer EQ set countdown       
+          //Hover animation               
           displayCall(false, 1, 12, true);
-          display.print(menuOptions[18]);
+          display.print(menuOptions[20]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            //Reserved
-            menuCursor.clear();
-            menuPage = 0;
+            displayCall(true, 1, 12, false);
+            display.print(menuOptions[21]);
+            display.print((cycle.getEqCountdownTimeCfg() / (double)1000)/60);
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              cycle.setEqCountdownTimeCfg(cycle.getEqCountdownTimeCfg() + 60000);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              cycle.setEqCountdownTimeCfg(cycle.getEqCountdownTimeCfg() - 60000);                  
+            }
           }
           break;
 
