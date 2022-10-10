@@ -1,0 +1,6 @@
+{
+    "board": "arduino:avr:nano",
+    "port": "COM4",
+    "sketch": "MUF800R00\\automatico_v2\\automatico_v2.ino",
+    "programmer": "arduino:arduinoasisp"
+}
