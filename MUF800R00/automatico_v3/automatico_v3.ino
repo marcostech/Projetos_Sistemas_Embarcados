@@ -832,7 +832,7 @@ void loop() {
           digitalWrite(outputExtra, HIGH);
         }
         //Charge max hours and equalization countdown checker
-        if(cycle.getCountdownTime() == timeOut || cycle.getCurrentTimeHours() == battery.getMaxChargeTime()) {
+        if(cycle.getCountdownTime() == timeOut /*|| cycle.getCurrentTimeHours() == battery.getMaxChargeTime()*/) {
           lastTime = cycle.getCurrentTimeFormated();
           systemStatus = 2;
           display.clearDisplay();
@@ -888,8 +888,143 @@ void loop() {
       }
     }
 
+    //System Mode - Trac
+    while (systemMode.getCurrentMode() == 2) {      // On Charge Routine      
+      byte systemStatus = 1; //Start System on Status - 0
+      //Charger - Charge
+      cycle.countdownBegin(cycle.getEqCountdownTimeCfg());
+      bool eqFlag = false;
+      digitalWrite(outputRelay, HIGH);
+      digitalWrite(outputExtra, LOW);
+      while(systemStatus == 1) {
+        //Button state checker - menu entry
+        if (menuCursor.readPress(10) == 1) {
+          cursorDelayTime++;
+        } else {
+          cursorDelayTime = 0;
+        }
+        if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+          cursorDelayTime = 0;
+          systemStatus = 1;
+          menuConfig();
+        }
+        //Led system on blink
+        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        //Voltage reading and battery setting
+        battery.setVoltage(adc.getReading(8000));
+        //Display routine
+        display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
+        display.setTextColor(SSD1306_WHITE);
+        display.fillRect(34, 0, 80, 32, SSD1306_BLACK);
+        display.setTextSize(2);
+        display.setCursor(52, 1);
+        display.println(battery.getVoltage(), 2);
+        /*
+        //Send Json
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+          delay(50);
+        }
+        */
+        
+        //Charge complete checker
+        // if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
+        //   lastTime = cycle.getCurrentTimeFormated();
+        //   systemStatus = 2;
+        //   display.clearDisplay();
+        //   previousMillis = millis();
+        // } 
+
+        //Charge complete checker
+        if(battery.getEndVoltage() < battery.getVoltage()) {                    
+          eqFlag = true;
+        }
+        //Disable Equalization only if voltage goes below set point
+        if(battery.getStartVoltage() > battery.getVoltage()) {
+          eqFlag = false;
+        }        
+        if(eqFlag){
+          display.setTextSize(1); 
+          display.setCursor(52, 16);
+          display.println(F("Equalizar:"));
+          display.setCursor(52, 24);
+          display.println(cycle.getCountdownTime());
+          display.display();
+          //Led status blinker
+          digitalRead(outputExtra) ? digitalWrite(outputExtra, LOW) : digitalWrite(outputExtra, HIGH);
+        } else {
+          //Reset if conditions are not met, countdownTime = countdownBegin  
+          display.setTextSize(1);
+          display.setCursor(52, 16);
+          display.println(F("Em carga:"));
+          display.setCursor(52, 24);
+          display.println(cycle.getCurrentTimeFormated());
+          display.display();
+          cycle.countdownReset();
+          //Set Output default state
+          digitalWrite(outputExtra, LOW);
+        }
+        //Charge max hours and equalization countdown checker
+        if(cycle.getCountdownTime() == timeOut || cycle.getCurrentTimeHours() == battery.getMaxChargeTime()) {
+          lastTime = cycle.getCurrentTimeFormated();
+          systemStatus = 2;
+          display.clearDisplay();
+          previousMillis = millis();
+        }
+
+      }
+    
+      //Charger - Complete
+      while (systemStatus == 2) {      // Charge Complete Routine
+        digitalWrite(outputRelay, LOW);
+        digitalWrite(outputExtra, HIGH);
+        //Button state checker - menu entry
+        if (menuCursor.readPress(10) == 1) {
+          cursorDelayTime++;
+        } else {
+          cursorDelayTime = 0;
+        }
+        if (cursorDelayTime > cursorDelayTimeMenuEntry) {
+          cursorDelayTime = 0;
+          systemStatus = 1;
+          menuConfig();
+        }
+        
+        battery.setVoltage(adc.getReading(4000));
+        //Display Routine
+        display.clearDisplay();
+        display.setTextSize(1);
+        display.setCursor(1, 1);
+        display.print(F("Completa: ciclo "));
+        display.print(cycle.getCurrentCycle());
+        display.setTextSize(2);
+        display.setCursor(1, 15);
+        display.println(lastTime);
+        display.display();
+
+        /*
+        //Send Json
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
+          delay(50);
+        }
+        */
+        //Start Voltage checker
+        if (battery.getVoltage() < battery.getStartVoltage()) { 
+          cycle.addCurrentCycle();
+          systemStatus = 1;
+          display.clearDisplay();
+          cycle.setOffsetMillis(millis());
+        }
+      }
+    }
+
     //System Mode - Bloq
-    while (systemMode.getCurrentMode() == 2) {      // Use Bloq Routine      
+    while (systemMode.getCurrentMode() == 3) {      // Use Bloq Routine      
       byte systemStatus = 1; //Start System on Status - 0
       cycle.countdownBegin(cycle.getCountdownTimeCfg());
       //Bloq - Unlocked
@@ -1183,65 +1318,65 @@ void menuConfig(){
           }
           break;
 
-        case 4: //Set Adc fix Value
-          //Hover animation     
-          displayCall(false, 1, 12, true);
-          display.print(menuOptions[4]);
-          display.display();
-          //Enter Menu
-          while (menuCursor.getMenuFlag()) {
-            displayCall(true, 1, 1, false);  //Animation remove
-            display.print(menuOptions[13]);
-            display.setCursor(1, 22);
-            display.print(adc.getAdcFix() * 1000);            
-            display.setCursor(28, 22);
-            display.print(adc.getReading(800), 2);
-            display.display();
-            //Button state checker
-            if (menuCursor.readPress(30) == 1) {
-              menuCursor.clearMenuFlag();
-              display.clearDisplay();
-            }                 
-            //Up - set
-            if (menuCursor.readPress(10) == 2) {
-              adc.setAdcFix(adc.getAdcFix() + 0.001);                  
-            }                
-            //Down - set
-            if (menuCursor.readPress(10) == 3) {
-              adc.setAdcFix(adc.getAdcFix() - 0.001);                  
-            }
-          }
-          break;
+        // case 4: //Set Adc fix Value
+        //   //Hover animation     
+        //   displayCall(false, 1, 12, true);
+        //   display.print(menuOptions[4]);
+        //   display.display();
+        //   //Enter Menu
+        //   while (menuCursor.getMenuFlag()) {
+        //     displayCall(true, 1, 1, false);  //Animation remove
+        //     display.print(menuOptions[13]);
+        //     display.setCursor(1, 22);
+        //     display.print(adc.getAdcFix() * 1000);            
+        //     display.setCursor(28, 22);
+        //     display.print(adc.getReading(800), 2);
+        //     display.display();
+        //     //Button state checker
+        //     if (menuCursor.readPress(30) == 1) {
+        //       menuCursor.clearMenuFlag();
+        //       display.clearDisplay();
+        //     }                 
+        //     //Up - set
+        //     if (menuCursor.readPress(10) == 2) {
+        //       adc.setAdcFix(adc.getAdcFix() + 0.001);                  
+        //     }                
+        //     //Down - set
+        //     if (menuCursor.readPress(10) == 3) {
+        //       adc.setAdcFix(adc.getAdcFix() - 0.001);                  
+        //     }
+        //   }
+        //   break;
 
-        case 5: //Set Adc R1 Value
-          //Hover animation
+        // case 5: //Set Adc R1 Value
+        //   //Hover animation
                
-          displayCall(false, 1, 22, true);
-          display.print(menuOptions[5]);
-          display.display(); 
-          //Enter Menu
-          while (menuCursor.getMenuFlag()) {
-            displayCall(true, 1, 1, false);            
-            display.print(menuOptions[11]);
-            display.print(adc.getR1());            
-            display.setCursor(28, 22);
-            display.print(adc.getReading(800), 2);
-            display.display();
-            //Button state checker
-            if (menuCursor.readPress(30) == 1) {
-              menuCursor.clearMenuFlag();
-              display.clearDisplay();
-            }                 
-            //Up - set
-            if (menuCursor.readPress(10) == 2) {
-              adc.setR1(adc.getR1() + 100);                  
-            }                
-            //Down - set
-            if (menuCursor.readPress(10) == 3) {
-              adc.setR1(adc.getR1() - 100);                  
-            }
-          }
-          break;
+        //   displayCall(false, 1, 22, true);
+        //   display.print(menuOptions[5]);
+        //   display.display(); 
+        //   //Enter Menu
+        //   while (menuCursor.getMenuFlag()) {
+        //     displayCall(true, 1, 1, false);            
+        //     display.print(menuOptions[11]);
+        //     display.print(adc.getR1());            
+        //     display.setCursor(28, 22);
+        //     display.print(adc.getReading(800), 2);
+        //     display.display();
+        //     //Button state checker
+        //     if (menuCursor.readPress(30) == 1) {
+        //       menuCursor.clearMenuFlag();
+        //       display.clearDisplay();
+        //     }                 
+        //     //Up - set
+        //     if (menuCursor.readPress(10) == 2) {
+        //       adc.setR1(adc.getR1() + 100);                  
+        //     }                
+        //     //Down - set
+        //     if (menuCursor.readPress(10) == 3) {
+        //       adc.setR1(adc.getR1() - 100);                  
+        //     }
+        //   }
+        //   break;
 
         case 6:
           menuPage = 2;
@@ -1270,34 +1405,34 @@ void menuConfig(){
           menuPage = 1;
           break;
 
-        case 6: //Set Adc R2 Value
-          //Hover animation               
-          displayCall(false, 1, 1, true);
-          display.print(menuOptions[6]);
-          display.display();
-          //Enter Menu
-          while (menuCursor.getMenuFlag()) {                
-            displayCall(true, 1, 1, false);
-            display.print(menuOptions[11]);
-            display.print(adc.getR2());            
-            display.setCursor(28, 22);
-            display.print(adc.getReading(800), 2);
-            display.display();
-            //Button state checker
-            if (menuCursor.readPress(30) == 1) {
-              menuCursor.clearMenuFlag();
-              display.clearDisplay();
-            }                 
-            //Up - set
-            if (menuCursor.readPress(10) == 2) {
-              adc.setR2(adc.getR2() + 50);                  
-            }                
-            //Down - set
-            if (menuCursor.readPress(10) == 3) {
-              adc.setR2(adc.getR2() - 50);                  
-            }
-          }
-          break;
+        // case 6: //Set Adc R2 Value
+        //   //Hover animation               
+        //   displayCall(false, 1, 1, true);
+        //   display.print(menuOptions[6]);
+        //   display.display();
+        //   //Enter Menu
+        //   while (menuCursor.getMenuFlag()) {                
+        //     displayCall(true, 1, 1, false);
+        //     display.print(menuOptions[11]);
+        //     display.print(adc.getR2());            
+        //     display.setCursor(28, 22);
+        //     display.print(adc.getReading(800), 2);
+        //     display.display();
+        //     //Button state checker
+        //     if (menuCursor.readPress(30) == 1) {
+        //       menuCursor.clearMenuFlag();
+        //       display.clearDisplay();
+        //     }                 
+        //     //Up - set
+        //     if (menuCursor.readPress(10) == 2) {
+        //       adc.setR2(adc.getR2() + 50);                  
+        //     }                
+        //     //Down - set
+        //     if (menuCursor.readPress(10) == 3) {
+        //       adc.setR2(adc.getR2() - 50);                  
+        //     }
+        //   }
+        //   break;
 
         case 7: //Set pre defined values for 24v - 36v - 48v
           //Hover animation               
@@ -1390,7 +1525,7 @@ void menuConfig(){
             displayCall(false, 1, 12);
             display.print(menuOptions[16]);
             displayCall(false, 1, 22);
-            display.print(menuOptions[18]);
+            display.print("Modo - Trac");
             //Button state checker
             switch (menuCursor.getCursorPositionInsideMenu()) {
               case 0: //Set Operation Mode - Auto
@@ -1416,7 +1551,7 @@ void menuConfig(){
                 //Enter Menu
                 while (menuCursor.getSubMenuFlag()) {
                   //Set Bloq
-                  systemMode.setMode(2);                  
+                  systemMode.setMode(3);                  
                   systemMode.setCountdownFlag(false);
                   menuCursor.clear();
                   menuPage = 0;
@@ -1426,12 +1561,13 @@ void menuConfig(){
               case 2: //Reserved
                 //Hover animation
                 displayCall(false, 1, 22, true);
-                display.print(menuOptions[17]);
+                display.print("Modo - Trac");
                 display.display();
                 //Enter Menu
                 while (menuCursor.getSubMenuFlag()) {
-                  //Set Reserved
-                  //systemMode.setMode() ?
+                  //Set Bloq
+                  systemMode.setMode(2);                  
+                  systemMode.setCountdownFlag(true);
                   menuCursor.clear();
                   menuPage = 0;
                 }
