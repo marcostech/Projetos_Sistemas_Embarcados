@@ -437,13 +437,13 @@ class ChargeCycle  {
       countdownValue = EEPROM.get(countdownValueADDR, countdownValue);
       delay(10);
       if (isnan(countdownValue) || countdownValue <= 0 || countdownValue >= OVF) {      
-        setCountdownTimeCfg(5000);
+        setCountdownTimeCfg(5000);//5s
       }
 
       eqCountdownValue = EEPROM.get(eqCountdownValueADDR, eqCountdownValue);
       delay(10);
       if (isnan(eqCountdownValue) || eqCountdownValue <= 0 || eqCountdownValue > 500000000) {      
-        setEqCountdownTimeCfg(60000);
+        setEqCountdownTimeCfg(3600000);//1Hr
       }
 
     }
@@ -549,7 +549,7 @@ class AdConverter {
       Resistor1 = EEPROM.get(R1ADDR, Resistor1);
       delay(10);
       if (isnan(Resistor1) || Resistor1 <= 0 || Resistor1 > OVF) {
-        Resistor1 = 98400.00;
+        Resistor1 = 198000.00;
       }
 
       Resistor2 = EEPROM.get(R2ADDR, Resistor2);
@@ -561,7 +561,7 @@ class AdConverter {
       adcFix = EEPROM.get(adcFixADDR, adcFix);
       delay(10);
       if (isnan(adcFix) || adcFix <= 0 || adcFix > OVF) {
-        adcFix = 0.002;
+        adcFix = 0.005;
       }
     }
 
@@ -627,7 +627,7 @@ ChargeCycle cycle;
 MenuCursor menuCursor;
 SystemMode systemMode;
 //TODO: Eeprom first read is hard coded, Change ?
-void setup() {  
+void setup() { 
   //3.5V external reference
   //analogReference(EXTERNAL);
   //Led PWR on cfg
@@ -649,7 +649,7 @@ void setup() {
       digitalWrite(LED_BUILTIN, LOW);
       delay(100);
     }
-  }
+  }  
   //Display Template
   display.clearDisplay(); //Clear display data
   display.drawBitmap(( display.width()  - LOGO_WIDTH ) / 2, (display.height() - LOGO_HEIGHT) / 2, logo_bmp, LOGO_WIDTH, LOGO_HEIGHT, 1);
