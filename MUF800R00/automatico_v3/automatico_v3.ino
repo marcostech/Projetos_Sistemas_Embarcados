@@ -108,16 +108,16 @@ uint8_t cursorDelayTime = 0; //buffer variable to store input data
 uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
 //EEPROM CFG
 const long OVF = 1000000;
-int systemModeADDR = 0;
-int endVoltageADDR = 10;
-int startVoltageADDR = 20;
-int maxChargeTimeADDR = 30;
-int R1ADDR = 40;
-int R2ADDR = 50;
-int adcFixADDR = 60;
-uint16_t countdownValueADDR = 70;
-uint8_t countdownFlagADDR = 80;
-uint8_t eqCountdownValueADDR = 90;
+int systemModeADDR = 100;
+int endVoltageADDR = 200;
+int startVoltageADDR = 300;
+int maxChargeTimeADDR = 400;
+int R1ADDR = 500;
+int R2ADDR = 600;
+int adcFixADDR = 700;
+uint16_t countdownValueADDR = 800;
+uint8_t countdownFlagADDR = 900;
+uint8_t eqCountdownValueADDR = 1000;
 
 //------------------------
 //void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
