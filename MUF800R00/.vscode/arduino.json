@@ -1,7 +1,6 @@
 {
     "board": "MiniCore:avr:328",
     "port": "COM3",
-    "sketch": "automatico_v3\\automatico_v3.ino",
-    "programmer": "arduino:arduinoasisp",
-    "configuration": "bootloader=uart0,eeprom=erase,variant=modelPB,BOD=4v3,LTO=Os,clock=16MHz_external"
+    "sketch": "automatico_v2\\automatico_v2.ino",
+    "programmer": "arduino:arduinoasisp"
 }
