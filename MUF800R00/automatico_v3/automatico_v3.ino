@@ -107,6 +107,7 @@ const char *timeOut = "Timeout";
 uint8_t cursorDelayTime = 0; //buffer variable to store input data
 uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
 //EEPROM CFG
+bool eepromLock = false;
 const long OVF = 1000000;
 int systemModeADDR = 100;
 int endVoltageADDR = 200;
@@ -130,20 +131,22 @@ class SystemMode{
   bool countdownFlag;
 
   public:
-  SystemMode():systemCurrentMode(1){};
+  SystemMode():systemCurrentMode(1){}; 
     
   void Begin() {
     systemCurrentMode = EEPROM.get(systemModeADDR, systemCurrentMode);
     delay(10);
     if (isnan(systemCurrentMode) || systemCurrentMode <= 0 || systemCurrentMode >= 4) {
-      //TODO: not working on first programmimg
-      setMode(1);
+      //TODO: after noise reset, value gets corrupted
+      systemCurrentMode = 1;
+      EEPROM.put(systemModeADDR, systemCurrentMode);      
     }
 
     countdownFlag = EEPROM.get(countdownFlagADDR, countdownFlag);
     delay(10);
     if (countdownFlag < 0 || countdownFlag > 1) {      
       countdownFlag = true;
+      EEPROM.put(countdownFlagADDR, countdownFlag);
     }
 
 
@@ -153,22 +156,26 @@ class SystemMode{
 1 = Charger Auto Mode
 2 = Bloq Mode
 */
-  void setMode(uint16_t newMode) {
+  void setMode(uint16_t newMode) {    
+    if(eepromLock && newMode > 0 && newMode < 4) {
     systemCurrentMode = newMode;
     EEPROM.put(systemModeADDR, systemCurrentMode);
+    }
   }
 
   uint16_t getCurrentMode(){
     return systemCurrentMode;
   }
 
-  void setCountdownFlag(bool newCountdownFlag){
+  void setCountdownFlag(bool newCountdownFlag){    
+    if(eepromLock && newCountdownFlag < 2 && newCountdownFlag >= 0) {    
     if(newCountdownFlag) {
       countdownFlag = 1;
     } else {
       countdownFlag = 0;
     }
     EEPROM.put(countdownFlagADDR, countdownFlag);
+    }
   }
 
   bool getCountdownFlag(){    
@@ -437,20 +444,24 @@ class ChargeCycle  {
       countdownValue = EEPROM.get(countdownValueADDR, countdownValue);
       delay(10);
       if (isnan(countdownValue) || countdownValue <= 0 || countdownValue >= OVF) {      
-        setCountdownTimeCfg(5000);//5s
+        countdownValue = 5000; //5s
+        EEPROM.put(countdownValueADDR, countdownValue);
       }
 
       eqCountdownValue = EEPROM.get(eqCountdownValueADDR, eqCountdownValue);
       delay(10);
       if (isnan(eqCountdownValue) || eqCountdownValue <= 0 || eqCountdownValue > 500000000) {      
-        setEqCountdownTimeCfg(3600000);//1Hr
+        eqCountdownValue = 3600000; //1HR
+        EEPROM.put(eqCountdownValueADDR, eqCountdownValue);
       }
 
     }
 
     void setCountdownTimeCfg(uint64_t newDelay){
+      if(eepromLock && newDelay > 0 && newDelay < OVF) {
       countdownValue = newDelay;
       EEPROM.put(countdownValueADDR, countdownValue);
+      }
     }
 
     uint64_t getCountdownTimeCfg() {
@@ -458,8 +469,10 @@ class ChargeCycle  {
     }
 
     void setEqCountdownTimeCfg(uint64_t newDelay){
+      if(eepromLock && newDelay > 0 && newDelay < 500000000) {
       eqCountdownValue = newDelay;
       EEPROM.put(eqCountdownValueADDR, eqCountdownValue);
+      }
     }
 
     uint64_t getEqCountdownTimeCfg() {
@@ -482,18 +495,21 @@ class Battery {
       delay(10);
       if (isnan(endVoltage) || endVoltage <= 0 || endVoltage > OVF) {
         endVoltage = 14.70;
+        EEPROM.put(endVoltageADDR, endVoltage);
       }
 
       startVoltage = EEPROM.get(startVoltageADDR, startVoltage);
       delay(10);
       if (isnan(startVoltage) || startVoltage <= 0 || startVoltage > OVF) {
         startVoltage = 11.80;
+        EEPROM.put(startVoltageADDR, startVoltage);
       }
 
       maxChargeTime = EEPROM.get(maxChargeTimeADDR, maxChargeTime);
       delay(10);
       if (isnan(maxChargeTime) || maxChargeTime <= 0 || maxChargeTime > 254) {
         maxChargeTime = 10;
+        EEPROM.put(maxChargeTimeADDR, maxChargeTime);
       }
     }
 
@@ -514,18 +530,24 @@ class Battery {
     }
 
     void  setStartVoltage (float voltage) {
+      if(eepromLock && voltage > 0 && voltage < OVF) {
       startVoltage = voltage;
       EEPROM.put(startVoltageADDR, startVoltage);
+      }
     }
 
     void  setEndVoltage (float voltage) {
+      if(eepromLock && voltage > 0 && voltage < OVF) {        
       endVoltage = voltage;
       EEPROM.put(endVoltageADDR, endVoltage);
+      }
     }
 
     void setMaxChargeTime (byte newChargeTime) {
+      if(eepromLock && newChargeTime > 0 && newChargeTime < 254) {
       maxChargeTime = newChargeTime;
       EEPROM.put(maxChargeTimeADDR, maxChargeTime);
+      }
     }
 
     byte getMaxChargeTime () {
@@ -549,19 +571,22 @@ class AdConverter {
       Resistor1 = EEPROM.get(R1ADDR, Resistor1);
       delay(10);
       if (isnan(Resistor1) || Resistor1 <= 0 || Resistor1 > OVF) {
-        Resistor1 = 198000.00;
+        Resistor1 = 200000.00;
+        EEPROM.put(R1ADDR, Resistor1);
       }
 
       Resistor2 = EEPROM.get(R2ADDR, Resistor2);
       delay(10);
       if (isnan(Resistor2) || Resistor2 <= 0 || Resistor2 > OVF) {
-        Resistor2 = 4550.00;
+        Resistor2 = 5000.00;
+        EEPROM.put(R2ADDR, Resistor2);
     }
 
       adcFix = EEPROM.get(adcFixADDR, adcFix);
       delay(10);
       if (isnan(adcFix) || adcFix <= 0 || adcFix > OVF) {
         adcFix = 0.005;
+        EEPROM.put(adcFixADDR, adcFix);
       }
     }
 
@@ -585,8 +610,10 @@ class AdConverter {
     }
 
     void setAdcFix (float fixValue) {
+      if(eepromLock && fixValue > 0 && fixValue < OVF) {
       adcFix = fixValue;
       EEPROM.put(adcFixADDR, adcFix);
+      }
     }
 
     float getAdcFix () {
@@ -594,8 +621,10 @@ class AdConverter {
     }
 
     void setR1 (float R1Value) {
+      if(eepromLock && R1Value > 0 && R1Value < OVF) {
       Resistor1 = R1Value;
       EEPROM.put(R1ADDR, Resistor1);
+      }
     }
 
     float getR1 () {
@@ -603,8 +632,10 @@ class AdConverter {
     }
 
     void setR2 (float R2Value) {
+      if(eepromLock && R2Value > 0 && R2Value < OVF) {
       Resistor2 = R2Value;
       EEPROM.put(R2ADDR, Resistor2);
+      }
     }
 
     float getR2 () {
@@ -626,7 +657,7 @@ Battery battery;
 ChargeCycle cycle;
 MenuCursor menuCursor;
 SystemMode systemMode;
-//TODO: Eeprom first read is hard coded, Change ?
+
 void setup() { 
   //3.5V external reference
   //analogReference(EXTERNAL);
@@ -1182,6 +1213,7 @@ void menuConfig(){
   display.display();
   delay(1000); //make small delay for the user to release the Enter button
   while (true) {
+    eepromLock = true;
     //Page 1
     while (menuPage == 0) {
       //Menu display - necessary here for correct exhibition after the hover animation
@@ -1206,6 +1238,7 @@ void menuConfig(){
           while (menuCursor.getMenuFlag()) { 
             display.clearDisplay();
             menuCursor.clear();  
+            eepromLock = false;
             return; //exit function              
           }
           break;

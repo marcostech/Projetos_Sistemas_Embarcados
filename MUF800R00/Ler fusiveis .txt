@@ -1,0 +1,1 @@
+avrdude -C"C:\Users\projeto\AppData\Local\Arduino15\packages\arduino\tools\avrdude\6.3.0-arduino18/etc/avrdude.conf" -v -patmega328pb -cstk500v1 -PCOM3 -b19200 -U lfuse:r:-:i
