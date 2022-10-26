@@ -67,32 +67,31 @@ Menu Strings
 [1] = "1 - V de REcarga"
 [2] = "2 - V final de carga"
 [3] = "3 - T maximo de carga"
-[4] = "4 - Corrigir ADC"
-[5] = "5 - Setar R1"
-[6] = "6 - Setar R2"
-[7] = "7 - Pre-Cfg" 
-[8] = "1 - 24V"
-[9] = "2 - 36V"
-[10] = "3 - 48V",
+[4] = "4 - Pre-Cfg"
+[5] = "5 - Modo Operacao"
+[6] = "6 - Tempo Retardo"
+[7] = "7 - Tempo EQ" 
+[8] = "1 - Auto 12V"
+[9] = "2 - Auto 24V"
+[10] = "3 - Auto 36V",
 [11] = "Valor atual: "
 [12] = "Valor atual em Horas:"
 [13] = "Valor em % multiplicado por 1000:"
-[14] = "Modo Operacao"
-[15] = "Modo - Auto"
-[16] = "Modo - Bloq"
-[17] = "9 - Tempo Retardo"
-[18] = "Reservado"
-[19] = "Valor atual em s: "
-[20] = "10 - Tempo EQ"
-[21] = "Valor em min.: "
+[14] = "8 - Reservado"
+[15] = "1 - Modo - Auto"
+[16] = "2 - Modo - Bloq"
+[17] = "3 - Modo - Trac"
+[18] = "Valor atual em s: "
+[19] = "4 - Auto 48V"
+[20] = "Valor em min.: "
 */
 const char *menuOptions[] = {
-  "Menu Prog. Sair", "1 - V de REcarga","2 - V final de carga",
-  "3 - T maximo de carga", "4 - Corrigir ADC", "5 - Setar R1",
-  "6 - Setar R2","7 - Pre-Cfg", "1 - 24V", "2 - 36V", "3 - 48V",
-  "Valor atual: ", "Valor atual em Horas:" , "Valor em % multiplicado por 1000:",
-  "8 - Modo Operacao", "Modo - Auto", "Modo - Bloq", "9 - Tempo Retardo",
-  "Reservado", "Valor em seg.: ", "10 - Tempo EQ", "Valor em min.: "
+  "-> Sair", "1 - V de REcarga","2 - V fim de carga",
+  "3 - T max de carga", "4 - Pre-Cfg", "5 - Modo Operacao",
+  "6 - Tempo Retardo","7 - Tempo EQ", "-> 12V", "-> 24V", "-> 36V",
+  "Valor atual: ", "Valor atual em Hr:" , "Valor em % mult. por 1000:",
+  "Reservado", "-> Auto", "-> Bloq", "-> Trac",
+  "Valor em seg.: ", "-> 48V", "Valor em min.: "
 };
 const char *timeOut = "Timeout";
 //ADC CFG
@@ -109,16 +108,16 @@ uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
 //EEPROM CFG
 bool eepromLock = false;
 const long OVF = 1000000;
-int systemModeADDR = 100;
-int endVoltageADDR = 200;
-int startVoltageADDR = 300;
-int maxChargeTimeADDR = 400;
-int R1ADDR = 500;
-int R2ADDR = 600;
-int adcFixADDR = 700;
-uint16_t countdownValueADDR = 800;
-uint8_t countdownFlagADDR = 900;
-uint8_t eqCountdownValueADDR = 1000;
+uint8_t systemModeADDR = 10;
+uint8_t endVoltageADDR = 20;
+uint8_t startVoltageADDR = 30;
+uint8_t maxChargeTimeADDR = 40;
+uint8_t R1ADDR = 50;
+uint8_t R2ADDR = 60;
+uint8_t adcFixADDR = 70;
+uint8_t countdownValueADDR = 80;
+uint8_t countdownFlagADDR = 90;
+uint8_t eqCountdownValueADDR = 100;
 
 //------------------------
 //void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
@@ -127,7 +126,7 @@ void displayCall();
 
 class SystemMode{
   private:
-  uint16_t systemCurrentMode;
+  uint8_t systemCurrentMode;
   bool countdownFlag;
 
   public:
@@ -156,14 +155,14 @@ class SystemMode{
 1 = Charger Auto Mode
 2 = Bloq Mode
 */
-  void setMode(uint16_t newMode) {    
+  void setMode(uint8_t newMode) {    
     if(eepromLock && newMode > 0 && newMode < 4) {
-    systemCurrentMode = newMode;
-    EEPROM.put(systemModeADDR, systemCurrentMode);
+      systemCurrentMode = newMode;
+      EEPROM.put(systemModeADDR, systemCurrentMode);
     }
   }
 
-  uint16_t getCurrentMode(){
+  uint8_t getCurrentMode(){
     return systemCurrentMode;
   }
 
@@ -400,10 +399,10 @@ class ChargeCycle  {
     String getCountdownTime(){      
       int64_t currentTimeSeconds = (millis() - countdownOffsetMillis ) / 1000;
       int64_t currentCountdownTime = countdownMaxTime - currentTimeSeconds;
-      uint16_t currentTimeMinutes = 0;
-      uint16_t currentTimeHoursFormated = 0;
-      uint16_t currentTimeSecondsFormated = 0;
-      uint16_t currentTimeMinutesFormated = 0;
+      uint8_t currentTimeMinutes = 0;
+      uint8_t currentTimeHoursFormated = 0;
+      uint8_t currentTimeSecondsFormated = 0;
+      uint8_t currentTimeMinutesFormated = 0;
       bool hasTimeLeft = true;
       //Early return - Timeout
       if(currentCountdownTime <= 0){
@@ -609,42 +608,42 @@ class AdConverter {
       return adcRead;
     }
 
-    void setAdcFix (float fixValue) {
-      if(eepromLock && fixValue > 0 && fixValue < OVF) {
-      adcFix = fixValue;
-      EEPROM.put(adcFixADDR, adcFix);
-      }
-    }
+    // void setAdcFix (float fixValue) {
+    //   if(eepromLock && fixValue > 0 && fixValue < OVF) {
+    //   adcFix = fixValue;
+    //   EEPROM.put(adcFixADDR, adcFix);
+    //   }
+    // }
 
     float getAdcFix () {
       return adcFix ;
     }
 
-    void setR1 (float R1Value) {
-      if(eepromLock && R1Value > 0 && R1Value < OVF) {
-      Resistor1 = R1Value;
-      EEPROM.put(R1ADDR, Resistor1);
-      }
-    }
+    // void setR1 (float R1Value) {
+    //   if(eepromLock && R1Value > 0 && R1Value < OVF) {
+    //   Resistor1 = R1Value;
+    //   EEPROM.put(R1ADDR, Resistor1);
+    //   }
+    // }
 
-    float getR1 () {
-      return Resistor1 ;
-    }
+    // float getR1 () {
+    //   return Resistor1 ;
+    // }
 
-    void setR2 (float R2Value) {
-      if(eepromLock && R2Value > 0 && R2Value < OVF) {
-      Resistor2 = R2Value;
-      EEPROM.put(R2ADDR, Resistor2);
-      }
-    }
+    // void setR2 (float R2Value) {
+    //   if(eepromLock && R2Value > 0 && R2Value < OVF) {
+    //   Resistor2 = R2Value;
+    //   EEPROM.put(R2ADDR, Resistor2);
+    //   }
+    // }
 
-    float getR2 () {
-      return Resistor2 ;
-    }
+    // float getR2 () {
+    //   return Resistor2 ;
+    // }
 
-    void setAdcChannel (byte NewAdcChannel) {
-      adcChannel = NewAdcChannel;
-    }
+    // void setAdcChannel (byte NewAdcChannel) {
+    //   adcChannel = NewAdcChannel;
+    // }
 
     byte getAdcChannel () {
       return adcChannel;
@@ -1209,6 +1208,7 @@ void displayCall(
 
 void menuConfig(){
   uint8_t menuPage = 0;
+  uint8_t menuPageInside = 0;
   display.clearDisplay();
   display.display();
   delay(1000); //make small delay for the user to release the Enter button
@@ -1351,7 +1351,169 @@ void menuConfig(){
           }
           break;
 
-        // case 4: //Set Adc fix Value
+        case 4: //Set pre defined values for 12V - 24v - 36v - 48v
+          //Hover animation               
+          displayCall(false, 1, 12, true);
+          display.print(menuOptions[4]);
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            menuPageInside = 1;
+            //Inside Page 1
+            while(menuPageInside == 1) {
+              menuCursor.updateCursor(menuCursor.readPress(20), true);            
+              displayCall(true, 1, 1);
+              display.print(menuOptions[8]);
+              displayCall(false, 1, 12);
+              display.print(menuOptions[9]);
+              displayCall(false, 1, 22);
+              display.print(menuOptions[10]);
+              //Button state checker
+              switch (menuCursor.getCursorPositionInsideMenu()) {              
+                case 0: //Set pre defined 12v
+                  //Hover animation
+                  displayCall(false, 1, 1, true);
+                  display.print(menuOptions[8]);
+                  display.display();
+                  //Enter Menu
+                  while (menuCursor.getSubMenuFlag()) {
+                    //Set 12V
+                    if(systemMode.getCurrentMode() < 3){
+                      battery.setStartVoltage(11.8);
+                      battery.setEndVoltage(14.7);
+                      battery.setMaxChargeTime(10);
+                    }
+                    else {
+                      battery.setStartVoltage(12.8);
+                      battery.setEndVoltage(10.2);
+                    }
+                    menuPageInside = 0;
+                    menuCursor.clear();
+                    menuPage = 0;
+                  }
+                  break;
+
+                case 1: //Set pre defined 24v
+                  //Hover animation
+                  displayCall(false, 1, 12, true);
+                  display.print(menuOptions[9]);
+                  display.display();
+                  //Enter Menu
+                  while (menuCursor.getSubMenuFlag()) {
+                    //Set 24V
+                    if(systemMode.getCurrentMode() < 3){
+                      battery.setStartVoltage(23.6);
+                      battery.setEndVoltage(29.5);
+                      battery.setMaxChargeTime(10);
+                    }
+                    else {
+                      battery.setStartVoltage(25.6);
+                      battery.setEndVoltage(20.4);
+                    }
+                    menuPageInside = 0;
+                    menuCursor.clear();
+                    menuPage = 0;
+                  }
+                  break;
+
+                case 2: //Set pre defined 36v
+                  //Hover animation
+                  displayCall(false, 1, 22, true);
+                  display.print(menuOptions[10]);
+                  display.display();
+                  //Enter Menu
+                  while (menuCursor.getSubMenuFlag()) {
+                    //Set 36V
+                    battery.setStartVoltage(35.4);
+                    battery.setEndVoltage(44.1);
+                    battery.setMaxChargeTime(10);
+                    menuPageInside = 0;
+                    menuCursor.clear();
+                    menuPage = 0;
+                  }
+                  break;
+
+                case 3:              
+                  menuPageInside = 2;
+                  break;
+
+                default:
+                  break;            
+              }
+            }
+            //Inside Page 2
+            while(menuPageInside == 2) {
+              menuCursor.updateCursor(menuCursor.readPress(20), true);            
+              displayCall(true, 1, 1);
+              display.print(menuOptions[19]);
+              displayCall(false, 1, 12);
+              display.print(menuOptions[14]);
+              displayCall(false, 1, 22);
+              display.print(menuOptions[14]);
+              //Button state checker
+              switch (menuCursor.getCursorPositionInsideMenu()) {
+                case 2:              
+                  menuPageInside = 1;
+                break;              
+
+                case 3: //Set pre defined 48v
+                  //Hover animation
+                  displayCall(false, 1, 1, true);
+                  display.print(menuOptions[19]);
+                  display.display();
+                  //Enter Menu
+                  while (menuCursor.getSubMenuFlag()) {
+                    //Set 48V
+                    battery.setStartVoltage(47.2);
+                    battery.setEndVoltage(59.5);
+                    battery.setMaxChargeTime(10);
+                    menuPageInside = 0;
+                    menuCursor.clear();
+                    menuPage = 0;
+                  }
+                  break;
+
+                case 4: //Reserved
+                    //Hover animation               
+                    displayCall(false, 1, 22, true);
+                    display.print(menuOptions[14]);
+                    display.display(); 
+                    //Enter Menu
+                    while (menuCursor.getMenuFlag()) {
+                      //Reserved
+                      menuPageInside = 0;
+                      menuCursor.clear();
+                      menuPage = 0;
+                    }
+                  break;
+
+                case 5: //Reserved
+                  //Hover animation               
+                  displayCall(false, 1, 22, true);
+                  display.print(menuOptions[14]);
+                  display.display(); 
+                  //Enter Menu
+                  while (menuCursor.getMenuFlag()) {
+                    //Reserved                  
+                    menuPageInside = 0;
+                    menuCursor.clear();
+                    menuPage = 0;
+                  }
+                  break;
+
+                case 6:
+                  menuPageInside = 0;
+                  menuCursor.clear();
+                  menuPage = 0;
+                  break;
+
+                default:
+                  break;            
+              }
+            }
+          }
+          break;
+        //Set Adc fix Value
         //   //Hover animation     
         //   displayCall(false, 1, 12, true);
         //   display.print(menuOptions[4]);
@@ -1381,10 +1543,80 @@ void menuConfig(){
         //   }
         //   break;
 
-        // case 5: //Set Adc R1 Value
-        //   //Hover animation
-               
-        //   displayCall(false, 1, 22, true);
+        case 5://Set Operation Mode
+          //Hover animation               
+          displayCall(false, 1, 22, true);
+          display.print(menuOptions[5]);
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            menuCursor.updateCursor(menuCursor.readPress(50), true);            
+            displayCall(true, 1, 1);
+            display.print(menuOptions[15]);
+            displayCall(false, 1, 12);
+            display.print(menuOptions[16]);
+            displayCall(false, 1, 22);
+            display.print(menuOptions[17]);
+            //Button state checker
+            switch (menuCursor.getCursorPositionInsideMenu()) {
+              case 0: //Set Operation Mode - Auto
+                //Hover animation
+                displayCall(false, 1, 1, true);
+                display.print(menuOptions[15]);
+                display.display();
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set Auto
+                  systemMode.setMode(1);
+                  systemMode.setCountdownFlag(true);
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
+
+              case 1: //Set Operation Mode - Bloq
+                //Hover animation
+                displayCall(false, 1, 12, true);
+                display.print(menuOptions[16]);
+                display.display();
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set Bloq
+                  systemMode.setMode(3);                  
+                  systemMode.setCountdownFlag(false);
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
+
+              case 2: //Reserved
+                //Hover animation
+                displayCall(false, 1, 22, true);
+                display.print(menuOptions[17]);
+                display.display();
+                //Enter Menu
+                while (menuCursor.getSubMenuFlag()) {
+                  //Set Bloq
+                  systemMode.setMode(2);                  
+                  systemMode.setCountdownFlag(true);
+                  menuCursor.clear();
+                  menuPage = 0;
+                }
+                break;
+
+              case 3:
+              menuCursor.clear();
+              menuPage = 0;
+              break;
+
+              default:
+              break;
+            }
+          }
+        break;
+         //Set Adc R1 Value
+         //Hover animation
+         //   displayCall(false, 1, 22, true);
         //   display.print(menuOptions[5]);
         //   display.display(); 
         //   //Enter Menu
@@ -1438,7 +1670,33 @@ void menuConfig(){
           menuPage = 1;
           break;
 
-        // case 6: //Set Adc R2 Value
+        case 6://Set countdown Time
+          //Hover animation               
+          displayCall(false, 1, 1, true);
+          display.print(menuOptions[6]);
+          display.display();
+          //Enter Menu
+          while (menuCursor.getMenuFlag()) {
+            displayCall(true, 1, 1, false);
+            display.print(menuOptions[18]);
+            display.print((cycle.getCountdownTimeCfg() / (double)1000));
+            display.display();
+            //Button state checker
+            if (menuCursor.readPress(30) == 1) {
+              menuCursor.clearMenuFlag();
+              display.clearDisplay();
+            }                 
+            //Up - set
+            if (menuCursor.readPress(10) == 2) {
+              cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() + 1000);                  
+            }                
+            //Down - set
+            if (menuCursor.readPress(10) == 3) {
+              cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() - 1000);                  
+            }
+          }
+          break;
+           //Set Adc R2 Value
         //   //Hover animation               
         //   displayCall(false, 1, 1, true);
         //   display.print(menuOptions[6]);
@@ -1467,219 +1725,15 @@ void menuConfig(){
         //   }
         //   break;
 
-        case 7: //Set pre defined values for 24v - 36v - 48v
+        case 7://Timer EQ set countdown       
           //Hover animation               
           displayCall(false, 1, 12, true);
           display.print(menuOptions[7]);
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            menuCursor.updateCursor(menuCursor.readPress(20), true);            
-            displayCall(true, 1, 1);
-            display.print(menuOptions[8]);
-            displayCall(false, 1, 12);
-            display.print(menuOptions[9]);
-            displayCall(false, 1, 22);
-            display.print(menuOptions[10]);
-            //Button state checker
-            switch (menuCursor.getCursorPositionInsideMenu()) {
-              case 0: //Set pre defined 24v
-                //Hover animation
-                displayCall(false, 1, 1, true);
-                display.print(menuOptions[8]);
-                display.display();
-                //Enter Menu
-                while (menuCursor.getSubMenuFlag()) {
-                  //Set 24V
-                  battery.setStartVoltage(23.6);
-                  battery.setEndVoltage(29.5);
-                  battery.setMaxChargeTime(10);
-
-                  menuCursor.clear();
-                  menuPage = 0;
-                }
-                break;
-
-              case 1: //Set pre defined 36v
-                //Hover animation
-                displayCall(false, 1, 12, true);
-                display.print(menuOptions[9]);
-                display.display();
-                //Enter Menu
-                while (menuCursor.getSubMenuFlag()) {
-                  //Set 36V
-                  battery.setStartVoltage(35.4);
-                  battery.setEndVoltage(44.1);
-                  battery.setMaxChargeTime(10);
-
-                  menuCursor.clear();
-                  menuPage = 0;
-                }
-                break;
-
-              case 2: //Set pre defined 48v
-                //Hover animation
-                displayCall(false, 1, 22, true);
-                display.print(menuOptions[10]);
-                display.display();
-                //Enter Menu
-                while (menuCursor.getSubMenuFlag()) {
-                  //Set 48V
-                  battery.setStartVoltage(47.2);
-                  battery.setEndVoltage(59.5);
-                  battery.setMaxChargeTime(10);
-
-                  menuCursor.clear();
-                  menuPage = 0;
-                }
-                break;
-
-              case 3:
-                menuCursor.clear();
-                menuPage = 0;
-                break;
-
-              default:
-                break;
-            }
-          }
-          break;
-        
-        case 8://Set Operation Mode
-          //Hover animation               
-          displayCall(false, 1, 22, true);
-          display.print(menuOptions[14]);
-          display.display();
-          //Enter Menu
-          while (menuCursor.getMenuFlag()) {
-            menuCursor.updateCursor(menuCursor.readPress(50), true);            
-            displayCall(true, 1, 1);
-            display.print(menuOptions[15]);
-            displayCall(false, 1, 12);
-            display.print(menuOptions[16]);
-            displayCall(false, 1, 22);
-            display.print("Modo - Trac");
-            //Button state checker
-            switch (menuCursor.getCursorPositionInsideMenu()) {
-              case 0: //Set Operation Mode - Auto
-                //Hover animation
-                displayCall(false, 1, 1, true);
-                display.print(menuOptions[15]);
-                display.display();
-                //Enter Menu
-                while (menuCursor.getSubMenuFlag()) {
-                  //Set Auto
-                  systemMode.setMode(1);
-                  systemMode.setCountdownFlag(true);
-                  menuCursor.clear();
-                  menuPage = 0;
-                }
-                break;
-
-              case 1: //Set Operation Mode - Bloq
-                //Hover animation
-                displayCall(false, 1, 12, true);
-                display.print(menuOptions[16]);
-                display.display();
-                //Enter Menu
-                while (menuCursor.getSubMenuFlag()) {
-                  //Set Bloq
-                  systemMode.setMode(3);                  
-                  systemMode.setCountdownFlag(false);
-                  menuCursor.clear();
-                  menuPage = 0;
-                }
-                break;
-
-              case 2: //Reserved
-                //Hover animation
-                displayCall(false, 1, 22, true);
-                display.print("Modo - Trac");
-                display.display();
-                //Enter Menu
-                while (menuCursor.getSubMenuFlag()) {
-                  //Set Bloq
-                  systemMode.setMode(2);                  
-                  systemMode.setCountdownFlag(true);
-                  menuCursor.clear();
-                  menuPage = 0;
-                }
-                break;
-
-              case 3:
-              menuCursor.clear();
-              menuPage = 0;
-              break;
-
-              default:
-              break;
-            }
-          }
-        break;
-
-        case 9:
-          menuPage = 3;
-          break;
-
-        default:
-          break;
-      }
-    }  
-    //Page 4
-    while (menuPage == 3) {
-      //Menu display
-      displayCall(true, 1, 1);
-      display.print(menuOptions[17]);
-      displayCall(false, 1, 12);
-      display.print(menuOptions[20]);
-      displayCall(false, 1, 22); 
-      display.print(menuOptions[18]);     
-      displayCall(false, 115, 12);
-      display.print(menuCursor.getMenuCursorPosition());
-      //Button Checker
-      menuCursor.updateCursor(menuCursor.readPress(20), false);
-      //Menu Selection
-      switch (menuCursor.getMenuCursorPosition()) {
-        case 8:
-          menuPage = 2;
-          break;
-
-        case 9: //Set countdown Time
-          //Hover animation               
-          displayCall(false, 1, 1, true);
-          display.print(menuOptions[17]);
-          display.display();
-          //Enter Menu
-          while (menuCursor.getMenuFlag()) {
-            displayCall(true, 1, 1, false);
-            display.print(menuOptions[19]);
-            display.print((cycle.getCountdownTimeCfg() / (double)1000));
-            display.display();
-            //Button state checker
-            if (menuCursor.readPress(30) == 1) {
-              menuCursor.clearMenuFlag();
-              display.clearDisplay();
-            }                 
-            //Up - set
-            if (menuCursor.readPress(10) == 2) {
-              cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() + 1000);                  
-            }                
-            //Down - set
-            if (menuCursor.readPress(10) == 3) {
-              cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() - 1000);                  
-            }
-          }
-          break;
-
-        case 10: //Timer EQ set countdown       
-          //Hover animation               
-          displayCall(false, 1, 12, true);
-          display.print(menuOptions[20]);
-          display.display();
-          //Enter Menu
-          while (menuCursor.getMenuFlag()) {
             displayCall(true, 1, 12, false);
-            display.print(menuOptions[21]);
+            display.print(menuOptions[20]);
             display.print((cycle.getEqCountdownTimeCfg() / (double)1000)/60);
             display.display();
             //Button state checker
@@ -1697,21 +1751,21 @@ void menuConfig(){
             }
           }
           break;
+         
+        // case 8://Reserved
+        //   //Hover animation               
+        //   displayCall(false, 1, 22, true);
+        //   display.print(menuOptions[18]);
+        //   display.display(); 
+        //   //Enter Menu
+        //   while (menuCursor.getMenuFlag()) {
+        //     //Reserved
+        //     menuCursor.clear();
+        //     menuPage = 0;
+        //   }
+        //   break;
 
-        case 11: //Reserved
-          //Hover animation               
-          displayCall(false, 1, 22, true);
-          display.print(menuOptions[18]);
-          display.display(); 
-          //Enter Menu
-          while (menuCursor.getMenuFlag()) {
-            //Reserved
-            menuCursor.clear();
-            menuPage = 0;
-          }
-          break;
-
-        case 12:
+        case 8:
           menuCursor.clear();
           menuPage = 0;
           break;
@@ -1719,7 +1773,102 @@ void menuConfig(){
         default:
           break;
       }
-    }    
+    }  
+    //Page 4
+    // while (menuPage == 3) {
+    //   //Menu display
+    //   displayCall(true, 1, 1);
+    //   display.print(menuOptions[17]);
+    //   displayCall(false, 1, 12);
+    //   display.print(menuOptions[20]);
+    //   displayCall(false, 1, 22); 
+    //   display.print(menuOptions[18]);     
+    //   displayCall(false, 115, 12);
+    //   display.print(menuCursor.getMenuCursorPosition());
+    //   //Button Checker
+    //   menuCursor.updateCursor(menuCursor.readPress(20), false);
+    //   //Menu Selection
+    //   switch (menuCursor.getMenuCursorPosition()) {
+    //     case 8:
+    //       menuPage = 2;
+    //       break;
+
+    //     case 9: //Set countdown Time
+    //       //Hover animation               
+    //       displayCall(false, 1, 1, true);
+    //       display.print(menuOptions[17]);
+    //       display.display();
+    //       //Enter Menu
+    //       while (menuCursor.getMenuFlag()) {
+    //         displayCall(true, 1, 1, false);
+    //         display.print(menuOptions[19]);
+    //         display.print((cycle.getCountdownTimeCfg() / (double)1000));
+    //         display.display();
+    //         //Button state checker
+    //         if (menuCursor.readPress(30) == 1) {
+    //           menuCursor.clearMenuFlag();
+    //           display.clearDisplay();
+    //         }                 
+    //         //Up - set
+    //         if (menuCursor.readPress(10) == 2) {
+    //           cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() + 1000);                  
+    //         }                
+    //         //Down - set
+    //         if (menuCursor.readPress(10) == 3) {
+    //           cycle.setCountdownTimeCfg(cycle.getCountdownTimeCfg() - 1000);                  
+    //         }
+    //       }
+    //       break;
+
+    //     case 10: //Timer EQ set countdown       
+    //       //Hover animation               
+    //       displayCall(false, 1, 12, true);
+    //       display.print(menuOptions[20]);
+    //       display.display();
+    //       //Enter Menu
+    //       while (menuCursor.getMenuFlag()) {
+    //         displayCall(true, 1, 12, false);
+    //         display.print(menuOptions[21]);
+    //         display.print((cycle.getEqCountdownTimeCfg() / (double)1000)/60);
+    //         display.display();
+    //         //Button state checker
+    //         if (menuCursor.readPress(30) == 1) {
+    //           menuCursor.clearMenuFlag();
+    //           display.clearDisplay();
+    //         }                 
+    //         //Up - set
+    //         if (menuCursor.readPress(10) == 2) {
+    //           cycle.setEqCountdownTimeCfg(cycle.getEqCountdownTimeCfg() + 60000);                  
+    //         }                
+    //         //Down - set
+    //         if (menuCursor.readPress(10) == 3) {
+    //           cycle.setEqCountdownTimeCfg(cycle.getEqCountdownTimeCfg() - 60000);                  
+    //         }
+    //       }
+    //       break;
+
+    //     case 11: //Reserved
+    //       //Hover animation               
+    //       displayCall(false, 1, 22, true);
+    //       display.print(menuOptions[18]);
+    //       display.display(); 
+    //       //Enter Menu
+    //       while (menuCursor.getMenuFlag()) {
+    //         //Reserved
+    //         menuCursor.clear();
+    //         menuPage = 0;
+    //       }
+    //       break;
+
+    //     case 12:
+    //       menuCursor.clear();
+    //       menuPage = 0;
+    //       break;
+
+    //     default:
+    //       break;
+    //   }
+    // }    
   }
 }
 //
