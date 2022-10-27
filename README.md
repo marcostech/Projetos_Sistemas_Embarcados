@@ -4,7 +4,10 @@ Projetos desenvolvidos também com layout PCB e esquema elétrico.
 
 Trabalhando atualmente em :
 - Sistema - MUF800R00
-- Versão atual - V3 (automatico+EQ e bloqueador)
+- Versão atual - V4 :
+  - Automatico 12v/24v/36v/48v
+  - Tracionário 12v/24v/36v/48v
+  - Bloqueador 12v/24v/36v/48v 
 
 Sistemas desenvolvidos para uso industrial.
 - MUF800R00: -> Sistema alvo Arduino -> WIP saida JSON
