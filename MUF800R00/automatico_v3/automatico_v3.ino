@@ -63,26 +63,26 @@ static const unsigned char PROGMEM logo_bmp[] =
 };
 /*
 Menu Strings
-[0] = "Menu Prog. Sair"
+[0] = "-> Sair"
 [1] = "1 - V de REcarga"
-[2] = "2 - V final de carga"
-[3] = "3 - T maximo de carga"
+[2] = "2 - V fim de carga"
+[3] = "3 - T max de carga"
 [4] = "4 - Pre-Cfg"
 [5] = "5 - Modo Operacao"
 [6] = "6 - Tempo Retardo"
 [7] = "7 - Tempo EQ" 
-[8] = "1 - Auto 12V"
-[9] = "2 - Auto 24V"
-[10] = "3 - Auto 36V",
+[8] = "-> Auto 12V"
+[9] = "-> Auto 24V"
+[10] = "-> Auto 36V",
 [11] = "Valor atual: "
-[12] = "Valor atual em Horas:"
-[13] = "Valor em % multiplicado por 1000:"
+[12] = "Valor atual em Hr:"
+[13] = "Valor em % mult. por 1000:"
 [14] = "8 - Reservado"
-[15] = "1 - Modo - Auto"
-[16] = "2 - Modo - Bloq"
-[17] = "3 - Modo - Trac"
+[15] = "-> Modo - Auto"
+[16] = "-> Modo - Bloq"
+[17] = "-> Modo - Trac"
 [18] = "Valor atual em s: "
-[19] = "4 - Auto 48V"
+[19] = "-> Auto 48V"
 [20] = "Valor em min.: "
 */
 const char *menuOptions[] = {
