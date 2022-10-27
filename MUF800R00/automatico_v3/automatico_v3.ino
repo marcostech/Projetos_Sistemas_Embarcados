@@ -107,7 +107,7 @@ uint8_t cursorDelayTime = 0; //buffer variable to store input data
 uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
 //EEPROM CFG
 bool eepromLock = false;
-const long OVF = 1000000;
+const uint32_t OVF = 1000000;
 uint8_t systemModeADDR = 10;
 uint8_t endVoltageADDR = 20;
 uint8_t startVoltageADDR = 30;
@@ -312,24 +312,24 @@ class MenuCursor{
 
 class ChargeCycle  {
   private:
-    short currentTimeHours;
-    byte currentCycle;
-    unsigned long offsetMillis;
-    uint64_t countdownOffsetMillis;
-    uint64_t countdownMaxTime;
+    uint8_t currentTimeHours;
+    uint8_t currentCycle;
+    uint32_t offsetMillis;
+    uint32_t countdownOffsetMillis;
+    uint32_t countdownMaxTime;
     bool countdownFlag;
-    uint64_t countdownValue;
-    uint64_t eqCountdownValue;
+    uint32_t countdownValue;
+    uint32_t eqCountdownValue;
 
   public:
     ChargeCycle():currentCycle(1), offsetMillis(0), currentTimeHours(0),countdownValue(0),eqCountdownValue(0){};    
 
     String getCurrentTimeFormated () {
-      unsigned long currentTimeSeconds = (millis() - offsetMillis ) / 1000; //Test different time scenarios here
-      short currentTimeMinutes = 0;
-      short currentTimeHoursFormated = 0;
-      short currentTimeSecondsFormated = 0;
-      short currentTimeMinutesFormated = 0;
+      uint32_t currentTimeSeconds = (millis() - offsetMillis ) / 1000; //Test different time scenarios here
+      uint8_t currentTimeMinutes = 0;
+      uint8_t currentTimeHoursFormated = 0;
+      uint8_t currentTimeSecondsFormated = 0;
+      uint8_t currentTimeMinutesFormated = 0;
       boolean hasTimeLeft = true;
 
       /*If the seconds variables has more than 60 then decrement 60 and add +1 to minutes
@@ -374,11 +374,11 @@ class ChargeCycle  {
       return currentCycle;
     }
 
-    void setOffsetMillis (unsigned long newOffsetMillis) {
+    void setOffsetMillis (uint32_t newOffsetMillis) {
       offsetMillis = newOffsetMillis;
     }
 
-    void setCurrentTimeHours (int timeValue) {
+    void setCurrentTimeHours (uint16_t timeValue) {
       currentTimeHours = timeValue;
     }
 
@@ -386,7 +386,7 @@ class ChargeCycle  {
       return currentTimeHours;
     }
 
-    void countdownBegin(uint64_t newCountdownTime){
+    void countdownBegin(uint32_t newCountdownTime){
       countdownOffsetMillis = millis();
       countdownMaxTime = newCountdownTime / 1000;
       countdownFlag = false;
@@ -397,8 +397,8 @@ class ChargeCycle  {
     }
 
     String getCountdownTime(){      
-      int64_t currentTimeSeconds = (millis() - countdownOffsetMillis ) / 1000;
-      int64_t currentCountdownTime = countdownMaxTime - currentTimeSeconds;
+      uint32_t currentTimeSeconds = (millis() - countdownOffsetMillis ) / 1000;
+      uint32_t currentCountdownTime = countdownMaxTime - currentTimeSeconds;
       uint8_t currentTimeMinutes = 0;
       uint8_t currentTimeHoursFormated = 0;
       uint8_t currentTimeSecondsFormated = 0;
@@ -456,25 +456,25 @@ class ChargeCycle  {
 
     }
 
-    void setCountdownTimeCfg(uint64_t newDelay){
+    void setCountdownTimeCfg(uint32_t newDelay){
       if(eepromLock && newDelay > 0 && newDelay < OVF) {
       countdownValue = newDelay;
       EEPROM.put(countdownValueADDR, countdownValue);
       }
     }
 
-    uint64_t getCountdownTimeCfg() {
+    uint32_t getCountdownTimeCfg() {
       return countdownValue;
     }
 
-    void setEqCountdownTimeCfg(uint64_t newDelay){
+    void setEqCountdownTimeCfg(uint32_t newDelay){
       if(eepromLock && newDelay > 0 && newDelay < 500000000) {
       eqCountdownValue = newDelay;
       EEPROM.put(eqCountdownValueADDR, eqCountdownValue);
       }
     }
 
-    uint64_t getEqCountdownTimeCfg() {
+    uint32_t getEqCountdownTimeCfg() {
       return eqCountdownValue;
     }
 };
@@ -484,7 +484,7 @@ class Battery {
     float voltage;
     float endVoltage;
     float startVoltage;
-    byte maxChargeTime;
+    uint8_t maxChargeTime;
 
   public:
     Battery():endVoltage(0), startVoltage(0), maxChargeTime(0), voltage(0){};
@@ -542,14 +542,14 @@ class Battery {
       }
     }
 
-    void setMaxChargeTime (byte newChargeTime) {
+    void setMaxChargeTime (uint8_t newChargeTime) {
       if(eepromLock && newChargeTime > 0 && newChargeTime < 254) {
       maxChargeTime = newChargeTime;
       EEPROM.put(maxChargeTimeADDR, maxChargeTime);
       }
     }
 
-    byte getMaxChargeTime () {
+    uint8_t getMaxChargeTime () {
       return maxChargeTime;
     }
 
@@ -560,7 +560,7 @@ class AdConverter {
     float Resistor1;
     float Resistor2;
     float adcFix;
-    byte adcChannel = ADC_CH;
+    uint8_t adcChannel = ADC_CH;
     float aref = 0.00488 ;
 
   public:
@@ -645,7 +645,7 @@ class AdConverter {
     //   adcChannel = NewAdcChannel;
     // }
 
-    byte getAdcChannel () {
+    uint8_t getAdcChannel () {
       return adcChannel;
     }
 };
@@ -700,7 +700,7 @@ void loop() {
   //Serial.begin(115200);
 
   //"Global" utils
-  unsigned long previousMillis = 0;
+  uint32_t previousMillis = 0;
   bool countdownFlagValue = systemMode.getCountdownFlag();
   String lastTime;
   //System Lock
@@ -719,7 +719,7 @@ void loop() {
 
     //System - Startup
     while (countdownFlagValue) {             
-      byte systemStatus = 1; //Start System on Status - 0
+      uint8_t systemStatus = 1; //Start System on Status - 0
       cycle.countdownBegin(cycle.getCountdownTimeCfg());
       //System - locked
       while(systemStatus == 1) {
@@ -785,7 +785,7 @@ void loop() {
 
     //System Mode - Auto
     while (systemMode.getCurrentMode() == 1) {      // On Charge Routine      
-      byte systemStatus = 1; //Start System on Status - 0
+      uint8_t systemStatus = 1; //Start System on Status - 0
       //Charger - Charge
       cycle.countdownBegin(cycle.getEqCountdownTimeCfg());
       bool eqFlag = false;
@@ -920,7 +920,7 @@ void loop() {
 
     //System Mode - Trac
     while (systemMode.getCurrentMode() == 2) {      // On Charge Routine      
-      byte systemStatus = 1; //Start System on Status - 0
+      uint8_t systemStatus = 1; //Start System on Status - 0
       //Charger - Charge
       cycle.countdownBegin(cycle.getEqCountdownTimeCfg());
       bool eqFlag = false;
@@ -1055,7 +1055,7 @@ void loop() {
 
     //System Mode - Bloq
     while (systemMode.getCurrentMode() == 3) {      // Use Bloq Routine      
-      byte systemStatus = 1; //Start System on Status - 0
+      uint8_t systemStatus = 1; //Start System on Status - 0
       cycle.countdownBegin(cycle.getCountdownTimeCfg());
       //Bloq - Unlocked
       while(systemStatus == 1) {
@@ -1226,7 +1226,7 @@ void menuConfig(){
       displayCall(false, 115, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button state checker
-      menuCursor.updateCursor(menuCursor.readPress(20), false);
+      menuCursor.updateCursor(menuCursor.readPress(15), false);
       //Menu Selection
       switch (menuCursor.getMenuCursorPosition()) {
         case 0: //Exit CFG menu
@@ -1317,7 +1317,7 @@ void menuConfig(){
       displayCall(false, 115, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
-      menuCursor.updateCursor(menuCursor.readPress(20), false);
+      menuCursor.updateCursor(menuCursor.readPress(15), false);
       //Menu Selection
       switch (menuCursor.getMenuCursorPosition()) {
         case 2:
@@ -1550,7 +1550,7 @@ void menuConfig(){
           display.display();
           //Enter Menu
           while (menuCursor.getMenuFlag()) {
-            menuCursor.updateCursor(menuCursor.readPress(50), true);            
+            menuCursor.updateCursor(menuCursor.readPress(20), true);            
             displayCall(true, 1, 1);
             display.print(menuOptions[15]);
             displayCall(false, 1, 12);
@@ -1663,7 +1663,7 @@ void menuConfig(){
       displayCall(false, 115, 12);
       display.print(menuCursor.getMenuCursorPosition());
       //Button Checker
-      menuCursor.updateCursor(menuCursor.readPress(20), false);
+      menuCursor.updateCursor(menuCursor.readPress(15), false);
       //Menu Selection
       switch (menuCursor.getMenuCursorPosition()) {
         case 5:
@@ -1786,7 +1786,7 @@ void menuConfig(){
     //   displayCall(false, 115, 12);
     //   display.print(menuCursor.getMenuCursorPosition());
     //   //Button Checker
-    //   menuCursor.updateCursor(menuCursor.readPress(20), false);
+    //   menuCursor.updateCursor(menuCursor.readPress(10), false);
     //   //Menu Selection
     //   switch (menuCursor.getMenuCursorPosition()) {
     //     case 8:
