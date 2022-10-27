@@ -5,7 +5,7 @@ Projetos desenvolvidos também com layout PCB e esquema elétrico.
 Trabalhando atualmente em :
 - Sistema - MUF800R00
 - Versão atual - V4 :
-  - Automatico 12v/24v/36v/48v
+  - Automático 12v/24v/36v/48v
   - Tracionário 12v/24v/36v/48v
   - Bloqueador 12v/24v/36v/48v 
 
