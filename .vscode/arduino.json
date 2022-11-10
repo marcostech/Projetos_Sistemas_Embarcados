@@ -1,7 +1,7 @@
 {
     "board": "MiniCore:avr:328",
-    "port": "COM3",
-    "sketch": "MUF800R00\\automatico_v4\\automatico_v4.ino",
+    "port": "COM7",
+    "sketch": "MUF800R00\\automatico_v4_serial\\automatico_v4_serial.ino",
     "programmer": "arduino:arduinoasisp",
     "configuration": "bootloader=uart0,eeprom=erase,variant=modelP,BOD=4v3,LTO=Os,clock=16MHz_external"
 }
