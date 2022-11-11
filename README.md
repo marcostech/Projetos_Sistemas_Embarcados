@@ -20,6 +20,7 @@ Sistemas desenvolvidos para uso industrial.
 - PSU100R00: -> Fonte de alimentação
 
 MUF800R00
-![alt text](MUF800R00/img1.jpeg)
-![alt text](MUF800R00/img2.jpeg)
-![alt text](MUF800R00/img3.jpeg)
+![imagem 3d](MUF800R00/3D.jpeg)
+![imagem em uso 1](MUF800R00/img1.jpeg)
+![imagem em uso 2](MUF800R00/img2.jpeg)
+![imagem em uso 3](MUF800R00/img3.jpeg)
