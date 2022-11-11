@@ -18,3 +18,6 @@ Sistemas desenvolvidos para uso industrial.
 - MUF700R00: -> Sistema alvo Arduino
   - Sistema de controle PWM para resistencias de aquecedores, porém usadas em outra finalidade em ambiente industrial e com baterias
 - PSU100R00: -> Fonte de alimentação
+
+MUF800R00
+![alt text](MUF800R00/img1.jpeg)
