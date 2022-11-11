@@ -722,8 +722,6 @@ void loop() {
 
     //System - Startup
     while (countdownFlagValue) { 
-      
-             
       uint8_t systemStatus = 1; //Start System on Status - 0
       cycle.countdownBegin(cycle.getCountdownTimeCfg());
       //System - locked
@@ -941,6 +939,7 @@ void loop() {
       digitalWrite(outputRelay, HIGH);
       digitalWrite(outputExtra, LOW);
       while(systemStatus == 1) {
+        
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
           cursorDelayTime++;
@@ -975,7 +974,7 @@ void loop() {
         */        
         //Serial function
         readSerial();
-        if (stringComplete && inputString == "R\n") {
+        if (/*stringComplete && inputString == "R\n"*/true) {
           if(!sendingString) {
             sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
           }
@@ -1212,7 +1211,7 @@ void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, St
     Serial.print(F(","));
     Serial.print(">");
     Serial.println();
-  sendingString = false;
+    sendingString = false;
   }
 }
 

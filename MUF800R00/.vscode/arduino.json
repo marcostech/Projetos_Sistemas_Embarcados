@@ -1,7 +1,7 @@
 {
+    "port": "COM7",
+    "configuration": "bootloader=uart0,eeprom=keep,variant=modelP,BOD=4v3,LTO=Os,clock=16MHz_external",
     "board": "MiniCore:avr:328",
-    "port": "COM3",
-    "sketch": "automatico_v3\\automatico_v3.ino",
-    "programmer": "arduino:arduinoasisp",
-    "configuration": "bootloader=uart0,eeprom=keep,variant=modelPB,BOD=4v3,LTO=Os,clock=16MHz_external"
+    "programmer": "MiniCore:arduinoasisp",
+    "sketch": "automatico_v4_serial\\automatico_v4_serial.ino"
 }
