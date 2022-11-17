@@ -1193,6 +1193,7 @@ void loop() {
 
 
 void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus) {    
+  //TODO: get values from classes
   sendingString = true;
   if(sendingString) {
     Serial.print("<");  
@@ -1208,6 +1209,18 @@ void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, St
     Serial.print(F(","));
     Serial.print(F("S: "));
     Serial.print(cycleStatus);  
+    Serial.print(F(","));
+    Serial.print(F("CFG1: "));
+    Serial.print(battery.getStartVoltage());  
+    Serial.print(F(","));
+    Serial.print(F("CFG2: "));
+    Serial.print(battery.getEndVoltage());  
+    Serial.print(F(","));
+    Serial.print(F("CFG3: "));
+    Serial.print(battery.getMaxChargeTime());  
+    Serial.print(F(","));
+    Serial.print(F("CFG4: "));
+    Serial.print(systemMode.getCurrentMode());  
     Serial.print(F(","));
     Serial.print(">");
     Serial.println();
