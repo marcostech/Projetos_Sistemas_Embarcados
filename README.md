@@ -4,7 +4,7 @@ Projetos desenvolvidos também com layout PCB e esquema elétrico.
 
 Trabalhando atualmente em :
 - Sistema - MUF800R00
-- Versão atual - V4 :
+- Versão atual - V4 Serial :
   - Automático 12v/24v/36v/48v
   - Tracionário 12v/24v/36v/48v
   - Bloqueador 12v/24v/36v/48v 
@@ -20,7 +20,6 @@ Sistemas desenvolvidos para uso industrial.
 - PSU100R00: -> Fonte de alimentação
 
 MUF800R00
+![anima gif](anima.gif)
+![imagem giga](img1.jpeg)
 ![imagem 3d](MUF800R00/3D.png)
-![imagem em uso 1](MUF800R00/img1.jpeg)
-![imagem em uso 2](MUF800R00/img2.jpeg)
-![imagem em uso 3](MUF800R00/img3.jpeg)
