@@ -19,7 +19,7 @@ Sistemas desenvolvidos para uso industrial.
   - Sistema de controle PWM para resistencias de aquecedores, porém usadas em outra finalidade em ambiente industrial e com baterias
 - PSU100R00: -> Fonte de alimentação
 
-MUF800R00
+MUF800R00<br>
 ![anima gif](anima.gif)
 ![imagem giga](img1.jpeg)
 ![imagem 3d](MUF800R00/3D.png)
