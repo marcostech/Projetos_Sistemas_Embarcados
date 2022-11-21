@@ -93,6 +93,15 @@ const char *menuOptions[] = {
   "Valor em seg.: ", "-> 48V", "Valor em min.: "
 };
 const char *timeOut = "Timeout";
+/*Status Strings
+[0] = Completa
+[1] = Em carga
+[2] = Iniciando
+[3] = Liberado
+[4] = Bloqueado
+*/
+const char *status[] = {"Completa","Em carga","Iniciando","Liberado","Bloqueado"};
+
 //ADC CFG
 #define ADC_CH  A0
 //Digital CFG
@@ -119,7 +128,7 @@ uint8_t countdownFlagADDR = 90;
 uint8_t eqCountdownValueADDR = 100;
 
 //------------------------
-void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus);
+void sendSerialJson(String cycleStatus, String totalTime);
 void menuConfig();
 void displayCall();
 
@@ -705,7 +714,7 @@ void loop() {
   //"Global" utils
   uint32_t previousMillis = 0;
   bool countdownFlagValue = systemMode.getCountdownFlag();
-  String lastTime;
+  String lastTime = "";
   //System Lock
   while (true) { //Power On Routine -- TODO: change to State Machina -> switch case?
     //Button state checker - menu entry
@@ -726,15 +735,27 @@ void loop() {
       cycle.countdownBegin(cycle.getCountdownTimeCfg());
       //System - locked
       while(systemStatus == 1) {
+        //Send Json
+        /*
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= 200) {
+          previousMillis = currentMillis;
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Iniciando"));
+          delay(50);
+        }
+        */        
         //Serial function
-        readSerial();
-        if (stringComplete && inputString == "R\n") {
-          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+        //readSerial();
+        if (/*stringComplete && inputString == "R\n"*/true) {
+          if(!sendingString) {
+            sendSerialJson(status[2], cycle.getCurrentTimeFormated());
+          }
           // clear the string:
           inputString = "";
           stringComplete = false;
-        } 
+        }
         //---
+
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
           cursorDelayTime++;
@@ -826,15 +847,27 @@ void loop() {
         display.setTextSize(2);
         display.setCursor(52, 1);
         display.println(battery.getVoltage(), 2);
-        /*
+        
         //Send Json
+        /*
         unsigned long currentMillis = millis();
         if (currentMillis - previousMillis >= 200) {
           previousMillis = currentMillis;
           sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
           delay(50);
         }
-        */
+        */        
+        //Serial function
+        //readSerial();
+        if (/*stringComplete && inputString == "R\n"*/true) {
+          if(!sendingString) {
+            sendSerialJson(status[1], cycle.getCurrentTimeFormated());
+          }
+          // clear the string:
+          inputString = "";
+          stringComplete = false;
+        }
+        //---
         
         //Charge complete checker
         // if (battery.getEndVoltage() < battery.getVoltage() || cycle.getCurrentTimeHours() == battery.getMaxChargeTime ()) {
@@ -865,7 +898,7 @@ void loop() {
           //Reset if conditions are not met, countdownTime = countdownBegin  
           display.setTextSize(1);
           display.setCursor(52, 16);
-          display.println(F("Em carga:"));
+          display.println(status[1]);
           display.setCursor(52, 24);
           display.println(cycle.getCurrentTimeFormated());
           display.display();
@@ -911,15 +944,26 @@ void loop() {
         display.println(lastTime);
         display.display();
 
-        /*
         //Send Json
+        /*
         unsigned long currentMillis = millis();
         if (currentMillis - previousMillis >= 200) {
           previousMillis = currentMillis;
-          sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Completa"));
           delay(50);
         }
-        */
+        */        
+        //Serial function
+        //readSerial();
+        if (/*stringComplete && inputString == "R\n"*/true) {
+          if(!sendingString) {
+            sendSerialJson(status[0], lastTime);
+          }
+          // clear the string:
+          inputString = "";
+          stringComplete = false;
+        }
+        //---
         //Start Voltage checker
         if (battery.getVoltage() < battery.getStartVoltage()) { 
           cycle.addCurrentCycle();
@@ -973,10 +1017,10 @@ void loop() {
         }
         */        
         //Serial function
-        readSerial();
+        //readSerial();
         if (/*stringComplete && inputString == "R\n"*/true) {
           if(!sendingString) {
-            sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+            sendSerialJson(status[1], cycle.getCurrentTimeFormated());
           }
           // clear the string:
           inputString = "";
@@ -1013,7 +1057,7 @@ void loop() {
           //Reset if conditions are not met, countdownTime = countdownBegin  
           display.setTextSize(1);
           display.setCursor(52, 16);
-          display.println(F("Em carga:"));
+          display.println(status[1]);
           display.setCursor(52, 24);
           display.println(cycle.getCurrentTimeFormated());
           display.display();
@@ -1059,15 +1103,27 @@ void loop() {
         display.println(lastTime);
         display.display();
 
-        /*
         //Send Json
+        /*
         unsigned long currentMillis = millis();
         if (currentMillis - previousMillis >= 200) {
           previousMillis = currentMillis;
-          sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Completa"));
           delay(50);
         }
-        */
+        */        
+        //Serial function
+        //readSerial();
+        if (/*stringComplete && inputString == "R\n"*/true) {
+          if(!sendingString) {
+            sendSerialJson(status[0], lastTime);
+          }
+          // clear the string:
+          inputString = "";
+          stringComplete = false;
+        }
+        //---
+
         //Start Voltage checker
         if (battery.getVoltage() < battery.getStartVoltage()) { 
           cycle.addCurrentCycle();
@@ -1108,15 +1164,28 @@ void loop() {
         display.setTextSize(2);
         display.setCursor(52, 1);
         display.println(battery.getVoltage(), 2);
+
+        ///Send Json
         /*
-        //Send Json
         unsigned long currentMillis = millis();
         if (currentMillis - previousMillis >= 200) {
           previousMillis = currentMillis;
-          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Em Carga"));
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Liberado"));
           delay(50);
         }
-        */
+        */        
+        //Serial function
+        //readSerial();
+        if (/*stringComplete && inputString == "R\n"*/true) {
+          if(!sendingString) {
+            sendSerialJson(status[3], cycle.getCurrentTimeFormated());
+          }
+          // clear the string:
+          inputString = "";
+          stringComplete = false;
+        }
+        //---
+
         //Battery Discharge checker
         if (battery.getEndVoltage() > battery.getVoltage()) {
           //Let countdownTime go freely  
@@ -1169,15 +1238,27 @@ void loop() {
         display.println(lastTime);
         display.display();
 
-        /*
         //Send Json
+        /*
         unsigned long currentMillis = millis();
         if (currentMillis - previousMillis >= 200) {
           previousMillis = currentMillis;
-          sendSerialJson(battery.getVoltage(), lastTime, cycle.getCurrentCycle(), F("Completa"));
+          sendSerialJson(battery.getVoltage(), cycle.getCurrentTimeFormated(), cycle.getCurrentCycle(), F("Bloqueado"));
           delay(50);
         }
-        */
+        */        
+        //Serial function
+        //readSerial();
+        if (/*stringComplete && inputString == "R\n"*/true) {
+          if(!sendingString) {
+            sendSerialJson(status[4], lastTime);
+          }
+          // clear the string:
+          inputString = "";
+          stringComplete = false;
+        }
+        //---
+
         //Battery charged checker
         if (battery.getVoltage() > battery.getStartVoltage()) { 
           cycle.addCurrentCycle();
@@ -1192,20 +1273,20 @@ void loop() {
 }
 
 
-void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, String cycleStatus) {    
-  //TODO: get values from classes
+void sendSerialJson(String cycleStatus, String totalTime) {   
+
   sendingString = true;
   if(sendingString) {
-    Serial.print("<");  
+    Serial.print(F("<"));  
     Serial.print(F(","));
     Serial.print(F("V: "));
-    Serial.print(batteryVoltage);  
+    Serial.print(battery.getVoltage());  
     Serial.print(F(","));
     Serial.print(F("T: "));
-    Serial.print(cycleTime);  
+    Serial.print(totalTime);
     Serial.print(F(","));
     Serial.print(F("C: "));
-    Serial.print(cycleCurrent);  
+    Serial.print(cycle.getCurrentCycle());  
     Serial.print(F(","));
     Serial.print(F("S: "));
     Serial.print(cycleStatus);  
@@ -1222,10 +1303,11 @@ void sendSerialJson(float batteryVoltage, String cycleTime, int cycleCurrent, St
     Serial.print(F("CFG4: "));
     Serial.print(systemMode.getCurrentMode());  
     Serial.print(F(","));
-    Serial.print(">");
+    Serial.print(F(">"));
     Serial.println();
     sendingString = false;
   }
+    
 }
 
 //Parameter 1 set a display.clearDisplay() command - boolean
