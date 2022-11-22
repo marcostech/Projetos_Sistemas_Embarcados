@@ -151,7 +151,7 @@ void sendSerialJson(String cycleStatus, String totalTime);
 void menuConfig();
 void displayCall();
 void output(bool relay, bool extra);
-void ledBlinker();
+void ledBlinker(bool builtInLed);
 
 class SystemMode{
   private:
