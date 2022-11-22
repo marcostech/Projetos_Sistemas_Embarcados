@@ -1,14 +1,28 @@
 /* Project Name: Sistema de Controle Automatico
    Author: Marcos Vinicius Pereira da Silva
    Date: 09/09/22
-   Description: Firmware to use in LUF800R00, this programm aims to give a easy
+   Description: Firmware to use in MUF800R00, this programm aims to give a easy
    setup and installation for the user, it can configure its main charge characteristics
    such as end voltage and maximum charge time. The main goal of this programm
    is to replace and be the standard for all automatic chargers of the company.
    To use this system is advised to install the Oled display on the i2c port, without
-   it will be very difficult to caliber the system, it can be used with only the serial port
-   but we recommend otherwise.
+   it will be very difficult to calibrate the system, it can be used with only the serial port
+   but we woundt recommend it.
    Any changes on this code is not permited, under lincesed use only
+*/
+/*
+Size original: 
+  32126 99% flash
+  1066 52% dynamic
+Size with pointers:
+  ----- --% flash
+  ---- --% dynamic
+Size with new digital write suport function:
+  32084 99% flash -> 42bytes reduction
+Size with new digital write blinking suport function:
+  32042 99% flash -> 42bytes reduction
+Size in usage of:
+  drawBitmap() = +- 100 bytes per call
 */
 //Library
 #include <EEPROM.h>
@@ -131,6 +145,8 @@ uint8_t eqCountdownValueADDR = 100;
 void sendSerialJson(String cycleStatus, String totalTime);
 void menuConfig();
 void displayCall();
+void output(bool relay, bool extra);
+void ledBlinker();
 
 class SystemMode{
   private:
@@ -670,7 +686,7 @@ bool stringComplete = false;  // whether the string is complete
 bool sendingString = false;
 void setup() {   
   Serial.begin(115200);
-  inputString.reserve(200);
+  inputString.reserve(1);
   //3.5V external reference
   //analogReference(EXTERNAL);
   //Led PWR on cfg
@@ -682,8 +698,8 @@ void setup() {
   pinMode(outputRelay, OUTPUT);
   pinMode(outputExtra, OUTPUT);
   //
-  digitalWrite(outputRelay, LOW);
-  digitalWrite(outputExtra, LOW);
+  //First output relay, second output extra
+  output(0,0);
   //Display verifier
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     while (true) { //Lock program if display fail
@@ -708,8 +724,8 @@ void loop() {
   systemMode.Begin();
   cycle.BeginCountdownCfg();
 
-  digitalWrite(outputRelay, LOW);
-  digitalWrite(outputExtra, LOW);
+  //First output relay, second output extra
+  output(0,0);
 
   //"Global" utils
   uint32_t previousMillis = 0;
@@ -768,7 +784,7 @@ void loop() {
           menuConfig();
         }
         //Led system on blink
-        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        ledBlinker(true);
         //Voltage reading and battery setting
         battery.setVoltage(adc.getReading(8000));
         //Display routine
@@ -822,8 +838,8 @@ void loop() {
       //Charger - Charge
       cycle.countdownBegin(cycle.getEqCountdownTimeCfg());
       bool eqFlag = false;
-      digitalWrite(outputRelay, LOW);
-      digitalWrite(outputExtra, HIGH);
+      //First output relay, second output extra
+      output(0,1);
       while(systemStatus == 1) {
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
@@ -837,7 +853,7 @@ void loop() {
           menuConfig();
         }
         //Led system on blink
-        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        ledBlinker(true);
         //Voltage reading and battery setting
         battery.setVoltage(adc.getReading(8000));
         //Display routine
@@ -892,8 +908,8 @@ void loop() {
           display.setCursor(52, 24);
           display.println(cycle.getCountdownTime());
           display.display();
-          //Led status blinker
-          digitalRead(outputExtra) ? digitalWrite(outputExtra, LOW) : digitalWrite(outputExtra, HIGH);
+          //output extra, status blinker
+          ledBlinker(false);          
         } else {
           //Reset if conditions are not met, countdownTime = countdownBegin  
           display.setTextSize(1);
@@ -918,8 +934,8 @@ void loop() {
     
       //Charger - Complete
       while (systemStatus == 2) {      // Charge Complete Routine
-        digitalWrite(outputRelay, HIGH);
-        digitalWrite(outputExtra, LOW);
+        //First output relay, second output extra
+        output(1,0);
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
           cursorDelayTime++;
@@ -980,8 +996,8 @@ void loop() {
       //Charger - Charge
       cycle.countdownBegin(cycle.getEqCountdownTimeCfg());
       bool eqFlag = false;
-      digitalWrite(outputRelay, HIGH);
-      digitalWrite(outputExtra, LOW);
+      //First output relay, second output extra
+      output(1,0);
       while(systemStatus == 1) {
         
         //Button state checker - menu entry
@@ -996,7 +1012,7 @@ void loop() {
           menuConfig();
         }
         //Led system on blink
-        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        ledBlinker(true);
         //Voltage reading and battery setting
         battery.setVoltage(adc.getReading(8000));
         //Display routine
@@ -1051,8 +1067,8 @@ void loop() {
           display.setCursor(52, 24);
           display.println(cycle.getCountdownTime());
           display.display();
-          //Led status blinker
-          digitalRead(outputExtra) ? digitalWrite(outputExtra, LOW) : digitalWrite(outputExtra, HIGH);
+          //output extra, status blinker
+          ledBlinker(false);
         } else {
           //Reset if conditions are not met, countdownTime = countdownBegin  
           display.setTextSize(1);
@@ -1077,8 +1093,8 @@ void loop() {
     
       //Charger - Complete
       while (systemStatus == 2) {      // Charge Complete Routine
-        digitalWrite(outputRelay, LOW);
-        digitalWrite(outputExtra, HIGH);
+        //First output relay, second output extra
+        output(0,1);
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
           cursorDelayTime++;
@@ -1140,8 +1156,8 @@ void loop() {
       cycle.countdownBegin(cycle.getCountdownTimeCfg());
       //Bloq - Unlocked
       while(systemStatus == 1) {
-        digitalWrite(outputRelay, LOW);
-        digitalWrite(outputExtra, HIGH);
+        //First output relay, second output extra
+        output(0,1);
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
           cursorDelayTime++;
@@ -1154,7 +1170,7 @@ void loop() {
           menuConfig();
         }
         //Led system on blink
-        !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW) ;
+        ledBlinker(true);
         //Voltage reading and battery setting
         battery.setVoltage(adc.getReading(8000));
         //Display routine
@@ -1212,8 +1228,8 @@ void loop() {
     
       //Bloq - Locked
       while (systemStatus == 2) {      // Charge Complete Routine 
-        digitalWrite(outputRelay, HIGH);
-        digitalWrite(outputExtra, LOW);
+        //First output relay, second output extra
+        output(1,0);
         //Button state checker - menu entry
         if (menuCursor.readPress(10) == 1) {
           cursorDelayTime++;
@@ -1314,7 +1330,7 @@ void sendSerialJson(String cycleStatus, String totalTime) {
 //Parameter 2 set the X screen position cursor - byte
 //Parameter 3 set the Y screen position cursor - byte
 //Parameter 4 invert the font color - boolean -> white on background and black on font
-//Parameter 5 set de font size -> byte
+//Parameter 5 set the font size -> byte
 void displayCall(
   bool clearDisplay = false,
   uint8_t x = 1,
@@ -2016,3 +2032,15 @@ void readSerial(){
   }  
 }
 //
+void output(bool relay, bool extra){
+  digitalWrite(outputRelay,relay);
+  digitalWrite(outputExtra,extra);
+}
+
+void ledBlinker(bool builtInLed) {
+  if(builtInLed) {
+    !digitalRead(LED_BUILTIN) ? digitalWrite(LED_BUILTIN, HIGH) : digitalWrite(LED_BUILTIN, LOW);
+    } else {
+      digitalRead(outputExtra) ? digitalWrite(outputExtra, LOW) : digitalWrite(outputExtra, HIGH);
+    }
+}
