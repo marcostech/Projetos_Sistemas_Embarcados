@@ -21,16 +21,21 @@ Size with new digital write suport function: tested on board[v]
   32084 99% flash -> 42bytes reduction
 Size with new digital write blinking suport function: tested on board[v]
   32042 99% flash -> 42bytes reduction
+Size with Adafruit_SSD1306 code reduction: tested on board[v]
+  31200 96% flash -> 842bytes reduction
+Size with Adafruit_GFX code reduction: tested on board[v]
+  30762 95% flash -> 438bytes reduction
+  1058 51% dynamic -> 8bytes reduction
+
 Size in usage of:
   drawBitmap() = +- 100 bytes per call
 */
 //Library
 #include <EEPROM.h>
-#include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-//------------------------
+//------------------------'
 //Display CFG
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
