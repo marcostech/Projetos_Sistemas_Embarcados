@@ -17,9 +17,9 @@ Size original:
 Size with pointers:
   ----- --% flash
   ---- --% dynamic
-Size with new digital write suport function:
+Size with new digital write suport function: tested on board[v]
   32084 99% flash -> 42bytes reduction
-Size with new digital write blinking suport function:
+Size with new digital write blinking suport function: tested on board[v]
   32042 99% flash -> 42bytes reduction
 Size in usage of:
   drawBitmap() = +- 100 bytes per call
