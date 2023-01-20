@@ -134,6 +134,12 @@ const char *status[] = {"Completa","Em carga","Iniciando","Liberado","Bloqueado"
 #define outputExtra 10
 //Amper meter offset
 uint32_t amperMeterOffset = 0;
+//Modifier Moving Average - mma
+uint64_t mmaSum = 0;
+uint32_t mmaBuffer[10];
+uint16_t mmaSamples = 10;
+uint16_t readIndex = 0;
+uint32_t avgTest = 0;
 //Menu entry CFG
 uint8_t cursorDelayTime = 0; //buffer variable to store input data
 uint8_t cursorDelayTimeMenuEntry = 5; //"delay" to enter cfg menu
@@ -759,21 +765,25 @@ void loop() {
     }
     
     //Set amper meter Offset
-    amperMeterOffset = amperMeterSetOffset();
+    amperMeterOffset = amperMeterSetOffset();    
     //System Mode - PWM
     //PWM lock
     //Amper Meter mock
-    while(true) {
+    while(true) { 
         //Led system on blink
         ledBlinker(true);        
         //Display routine        
         display.setTextColor(SSD1306_WHITE);
         display.fillRect(0, 0, 128, 32, SSD1306_BLACK);        
-        display.setTextSize(2);
-        display.setCursor(40, 1);
-        display.println(amperController());        
+        display.setTextSize(1);
+        display.setCursor(00, 1);
+        display.println(amperController(), 2);        
+        display.setCursor(50, 1);
+        display.println(modifiedMovingAverageController(), 2);        
         display.setCursor(00, 16);
         display.println(amperMeterOffset);
+        display.setCursor(50, 16);
+        display.println(avgTest);
         display.setCursor(80, 16);
         display.println(analogRead(ADC_CH));
         display.display();
@@ -2088,15 +2098,49 @@ uint16_t pwmController() {
 }
 
 float amperController() {
-  uint32_t buffer = 0;
+  uint64_t buffer = 0;
   for(int i = 0; i < 100; i++){
-    uint32_t reading = analogRead(ADC_CH);
+    uint64_t reading = analogRead(ADC_CH);
+    reading -= amperMeterOffset;
+    if(reading < 0) {
+      reading = 0;
+      }
     buffer += reading;
   }
   buffer /= 100;
-  buffer -= amperMeterOffset;
   float result = (buffer * ((float)5/1023) ) / 0.1;
   if(result < 0) { result = 0; }
+  return result;
+}
+
+float modifiedMovingAverageController(){
+  //Modified Moving Average
+  float result = 0;
+  uint64_t avgReading = 0;
+  if(mmaSum >= mmaBuffer[readIndex]){
+    mmaSum -= mmaBuffer[readIndex];  
+  } else{
+    mmaSum = 0;
+  }
+  for(int i = 0; i < 100; i++){
+    avgReading += analogRead(ADC_CH);
+  }  
+  mmaBuffer[readIndex] = avgReading / 100;
+  if(mmaBuffer[readIndex] <= amperMeterOffset){
+    mmaBuffer[readIndex] = 0;
+  } else{
+    mmaBuffer[readIndex] -= amperMeterOffset;
+  }
+  mmaSum += mmaBuffer[readIndex];
+  readIndex++;
+  if(readIndex >= mmaSamples) {
+    readIndex = 0;
+  }
+  if(mmaSum > 0){
+    avgTest = mmaSum;
+    result = mmaSum / mmaSamples;    
+    result = (result * ((float)5/1023)) / 0.1;
+  }
   return result;
 }
 
